@@ -65,9 +65,6 @@ export default function StatsTab({ markedDates, memos, today }: Props) {
       .filter(d => d.startsWith(`${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`))
   ).size
 
-  const nowLocal = new Date()
-  const isCurrentMonth = viewYear === nowLocal.getFullYear() && viewMonth === nowLocal.getMonth()
-
   return (
     <div className="px-5 py-5">
       {/* 월 네비게이션 */}
@@ -77,18 +74,6 @@ export default function StatsTab({ markedDates, memos, today }: Props) {
         </button>
         <div className="flex items-center gap-2">
           <h3 className="text-[17px] font-bold text-text-dark">{viewYear}년 {viewMonth + 1}월</h3>
-          {!isCurrentMonth && (
-            <button
-              onClick={() => {
-                const now = new Date()
-                setViewYear(now.getFullYear())
-                setViewMonth(now.getMonth())
-              }}
-              className="text-[11px] font-semibold text-teal px-2 py-0.5 rounded-[6px] bg-teal-light"
-            >
-              이번 달
-            </button>
-          )}
         </div>
         <button onClick={nextMonth} className="p-1.5 rounded-[10px] hover:bg-page-bg transition-colors">
           <ChevronRight size={18} className="text-text-gray" />
