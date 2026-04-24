@@ -146,12 +146,18 @@ export default function SettingsModal({ settings, tagList, tagColors, phone, onC
   const startYRef = useRef(0)
 
   useEffect(() => {
-    const prevent = (e: TouchEvent) => {
-      if (scrollRef.current?.contains(e.target as Node)) return
-      e.preventDefault()
+    const y = window.scrollY
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${y}px`
+    document.body.style.width = '100%'
+    document.body.style.overflowY = 'scroll'
+    return () => {
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.width = ''
+      document.body.style.overflowY = ''
+      window.scrollTo(0, y)
     }
-    document.addEventListener('touchmove', prevent, { passive: false })
-    return () => document.removeEventListener('touchmove', prevent)
   }, [])
 
   const onHandlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
