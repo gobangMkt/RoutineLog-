@@ -258,27 +258,29 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
           </div>
 
           {/* 메인 탭: 루틴 / 통계 */}
-          <div className="flex items-center">
-            <button
-              onClick={() => setMainTab('routine')}
-              className={`flex items-center gap-1.5 px-1 pb-2.5 mr-6 text-[14px] font-semibold border-b-2 transition-colors ${
-                mainTab === 'routine' ? 'border-teal text-teal' : 'border-transparent text-text-gray'
-              }`}
-            >
-              <CheckSquare size={15} /> 루틴
-            </button>
-            <button
-              onClick={() => setMainTab('stats')}
-              className={`flex items-center gap-1.5 px-1 pb-2.5 text-[14px] font-semibold border-b-2 transition-colors ${
-                mainTab === 'stats' ? 'border-teal text-teal' : 'border-transparent text-text-gray'
-              }`}
-            >
-              <BarChart2 size={15} /> 통계
-            </button>
+          <div className="flex items-center pb-3">
+            <div className="flex items-center gap-1 bg-page-bg rounded-[10px] p-1">
+              <button
+                onClick={() => setMainTab('routine')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-semibold transition-colors ${
+                  mainTab === 'routine' ? 'bg-surface text-teal shadow-sm' : 'text-text-gray hover:text-text-dark'
+                }`}
+              >
+                <CheckSquare size={14} /> 루틴
+              </button>
+              <button
+                onClick={() => setMainTab('stats')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-semibold transition-colors ${
+                  mainTab === 'stats' ? 'bg-surface text-teal shadow-sm' : 'text-text-gray hover:text-text-dark'
+                }`}
+              >
+                <BarChart2 size={14} /> 통계
+              </button>
+            </div>
             <div className="flex-1" />
             <button
               onClick={async () => { await clearSession(); window.location.reload() }}
-              className="flex items-center gap-1 text-[12px] text-text-gray hover:text-text-dark pb-2.5 transition-colors"
+              className="flex items-center gap-1 text-[12px] text-text-gray hover:text-text-dark transition-colors"
             >
               <LogOut size={12} /> {formatPhoneShort(phone)}
             </button>
@@ -350,7 +352,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
                 <div className="relative">
                   <button
                     onClick={() => setShowSortDrop(v => !v)}
-                    className="flex items-center gap-1 text-[12px] font-semibold px-2.5 py-1.5 rounded-[8px] bg-page-bg text-text-body hover:bg-border-def transition-colors"
+                    className="flex items-center gap-1 text-[12px] font-semibold text-text-gray hover:text-text-dark transition-colors"
                   >
                     {currentSortLabel}
                     <ChevronDown size={12} className="text-text-gray" />
