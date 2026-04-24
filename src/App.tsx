@@ -1,8 +1,18 @@
 import { useState } from 'react'
 import { Plus, StickyNote, CheckSquare, Settings, BookTemplate, LogOut } from 'lucide-react'
+import {
+  DndContext, closestCenter, PointerSensor, TouchSensor,
+  useSensor, useSensors, type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext, verticalListSortingStrategy,
+  useSortable, arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { useStore } from './store'
 import { getSession, clearSession } from './auth'
 import type { ParentTodo } from './types'
+import type { ViewMode } from './types'
 import AuthScreen from './components/AuthScreen'
 import Calendar from './components/Calendar'
 import ParentCard from './components/ParentCard'
@@ -15,6 +25,31 @@ import { getTagColor } from './components/TagManageModal'
 type Tab = 'todo' | 'memo'
 type Modal = 'addTodo' | 'template' | 'settings' | null
 
+const VIEW_MODES: { value: ViewMode; label: string }[] = [
+  { value: 'default', label: '추가순' },
+  { value: 'time',    label: '시간순' },
+  { value: 'tag',     label: '태그별' },
+]
+
+// 드래그 가능한 카드 래퍼
+function SortableCard({
+  parent,
+  children,
+}: {
+  parent: ParentTodo
+  children: (dragHandleProps: React.HTMLAttributes<HTMLDivElement>, isDragging: boolean) => React.ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: parent.id })
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`bg-surface mt-2 ${isDragging ? 'z-50 relative' : ''}`}
+    >
+      {children({ ...attributes, ...listeners }, isDragging)}
+    </div>
+  )
+}
 
 function MainApp({ phone, uid }: { phone: string; uid: string }) {
   const store = useStore(uid)
@@ -25,13 +60,18 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
   const {
     currentDate, setCurrentDate, goToToday,
     dayParents, getSubsFor, markedDates, parents,
-    addParent, updateParent, deleteParent, toggleParent,
+    addParent, updateParent, deleteParent, toggleParent, reorderParents,
     addSub, updateSub, deleteSub, toggleSub,
     getMemosForDate, addMemo, updateMemo, deleteMemo,
     tagList, tagColors, addTag, deleteTag, setTagColor, renameTag,
     templates, saveTemplate, deleteTemplate, applyTemplate,
     settings, setSettings,
   } = store
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+  )
 
   if (store.loading) return (
     <div className="min-h-screen bg-page-bg flex flex-col items-center justify-center gap-3">
@@ -46,6 +86,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
   const doneCount = dayParents.filter(p => p.status === 'done').length
   const totalCount = dayParents.length
   const dayMemos = getMemosForDate(currentDate)
+  const viewMode = settings.viewMode ?? 'default'
 
   const formatSelectedDate = (d: string) => {
     const date = new Date(d + 'T00:00:00')
@@ -57,11 +98,28 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
   const formatPhoneShort = (p: string) =>
     p.length === 11 ? `${p.slice(0, 3)}-${p.slice(3, 7)}-${p.slice(7)}` : p
 
-  // 태그별 보기: 그룹 헤더 렌더링
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = dayParents.findIndex(p => p.id === active.id)
+    const newIndex = dayParents.findIndex(p => p.id === over.id)
+    const reordered = arrayMove(dayParents, oldIndex, newIndex)
+    reorderParents(reordered.map(p => p.id))
+  }
+
+  const cardProps = {
+    tagList, tagColors, enableSubTodo: settings.enableSubTodo,
+    onToggle: toggleParent, onDelete: deleteParent,
+    onUpdate: (id: string, patch: Partial<ParentTodo>) => updateParent(id, patch),
+    onEdit: (p: ParentTodo) => setEditingParent(p),
+    onAddSub: addSub, onToggleSub: toggleSub, onDeleteSub: deleteSub,
+    onUpdateSub: (id: string, title: string) => updateSub(id, { title }),
+  }
+
   const renderTodoList = () => {
     if (dayParents.length === 0) {
       return (
-        <div className="bg-surface px-5 py-10 flex flex-col items-center text-text-gray">
+        <div className="bg-surface px-5 py-10 flex flex-col items-center">
           <div className="w-16 h-16 rounded-full bg-teal-light flex items-center justify-center mb-4 text-3xl">📋</div>
           <p className="text-[15px] font-semibold text-text-dark">TO-DO가 없어요</p>
           <p className="text-[14px] text-text-gray mt-1">아래 버튼으로 추가해보세요</p>
@@ -69,8 +127,31 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
       )
     }
 
-    if ((settings.viewMode ?? 'default') === 'tag') {
-      // 태그별 그룹화
+    // 추가순 — 드래그 가능
+    if (viewMode === 'default') {
+      return (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={dayParents.map(p => p.id)} strategy={verticalListSortingStrategy}>
+            {dayParents.map(parent => (
+              <SortableCard key={parent.id} parent={parent}>
+                {(dragHandleProps, isDragging) => (
+                  <ParentCard
+                    parent={parent}
+                    subs={getSubsFor(parent.id)}
+                    isDragging={isDragging}
+                    dragHandleProps={dragHandleProps}
+                    {...cardProps}
+                  />
+                )}
+              </SortableCard>
+            ))}
+          </SortableContext>
+        </DndContext>
+      )
+    }
+
+    // 태그별 — 그룹 헤더
+    if (viewMode === 'tag') {
       const groups: { tag: string | undefined; items: typeof dayParents }[] = []
       dayParents.forEach(p => {
         const last = groups[groups.length - 1]
@@ -81,7 +162,6 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
         <>
           {groups.map((group, gi) => (
             <div key={group.tag ?? '__none__'}>
-              {/* 그룹 헤더 */}
               <div className={`px-5 pb-2 ${gi > 0 ? 'pt-4' : 'pt-3'}`}>
                 {group.tag ? (
                   <span className={`text-[11px] font-bold px-2.5 py-1 rounded-[6px] ${getTagColor(group.tag, tagColors)}`}>
@@ -91,23 +171,9 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
                   <span className="text-[12px] font-semibold text-text-gray">태그 없음</span>
                 )}
               </div>
-              {group.items.map((parent, i) => (
-                <div key={parent.id} className={`bg-surface ${i > 0 ? 'mt-2' : ''}`}>
-                  <ParentCard
-                    parent={parent}
-                    subs={getSubsFor(parent.id)}
-                    tagList={tagList}
-                    tagColors={tagColors}
-                    enableSubTodo={settings.enableSubTodo}
-                    onToggle={toggleParent}
-                    onDelete={deleteParent}
-                    onUpdate={(id, patch) => updateParent(id, patch)}
-                    onEdit={p => setEditingParent(p)}
-                    onAddSub={addSub}
-                    onToggleSub={toggleSub}
-                    onDeleteSub={deleteSub}
-                    onUpdateSub={(id, title) => updateSub(id, { title })}
-                  />
+              {group.items.map(parent => (
+                <div key={parent.id} className="bg-surface mt-2">
+                  <ParentCard parent={parent} subs={getSubsFor(parent.id)} {...cardProps} />
                 </div>
               ))}
             </div>
@@ -116,26 +182,12 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
       )
     }
 
-    // default / time 보기
+    // 시간순
     return (
       <>
-        {dayParents.map((parent, i) => (
-          <div key={parent.id} className={`bg-surface ${i > 0 ? 'mt-2' : ''}`}>
-            <ParentCard
-              parent={parent}
-              subs={getSubsFor(parent.id)}
-              tagList={tagList}
-              tagColors={tagColors}
-              enableSubTodo={settings.enableSubTodo}
-              onToggle={toggleParent}
-              onDelete={deleteParent}
-              onUpdate={(id, patch) => updateParent(id, patch)}
-              onEdit={p => setEditingParent(p)}
-              onAddSub={addSub}
-              onToggleSub={toggleSub}
-              onDeleteSub={deleteSub}
-              onUpdateSub={(id, title) => updateSub(id, { title })}
-            />
+        {dayParents.map(parent => (
+          <div key={parent.id} className="bg-surface mt-2">
+            <ParentCard parent={parent} subs={getSubsFor(parent.id)} {...cardProps} />
           </div>
         ))}
       </>
@@ -148,10 +200,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
       <header className="sticky top-0 z-20 bg-surface border-b border-border-def w-full">
         <div className="max-w-[480px] mx-auto px-5 pt-5 pb-0 flex items-center justify-between">
           <div>
-            <h1
-              onClick={goToToday}
-              className="text-[20px] font-bold text-text-dark cursor-pointer leading-tight"
-            >
+            <h1 onClick={goToToday} className="text-[20px] font-bold text-text-dark cursor-pointer leading-tight">
               루틴로그
             </h1>
             <p className="text-[14px] text-text-gray mt-0.5">매일의 루틴을 기록하세요</p>
@@ -206,8 +255,8 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
           <Calendar currentDate={currentDate} markedDates={markedDates} onSelectDate={setCurrentDate} />
         </div>
 
-        {/* Date label */}
-        <div className="bg-surface mt-2 px-5 py-4">
+        {/* Date + progress + 정렬 탭 */}
+        <div className="bg-surface mt-2 px-5 pt-4 pb-3">
           <div className="flex items-center justify-between">
             <h2 className="text-[15px] font-semibold text-text-dark">{formatSelectedDate(currentDate)}</h2>
             {tab === 'todo' && totalCount > 0 && (
@@ -220,6 +269,29 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
                 className="h-full bg-teal rounded-full transition-all duration-500"
                 style={{ width: `${Math.round((doneCount / totalCount) * 100)}%` }}
               />
+            </div>
+          )}
+
+          {/* 정렬 탭 — TO-DO 탭에서만 표시 */}
+          {tab === 'todo' && (
+            <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-border-def">
+              <span className="text-[11px] text-text-gray font-medium mr-0.5">정렬</span>
+              {VIEW_MODES.map(m => (
+                <button
+                  key={m.value}
+                  onClick={() => setSettings({ ...settings, viewMode: m.value })}
+                  className={`px-3 py-1 rounded-full text-[12px] font-semibold transition-colors ${
+                    viewMode === m.value
+                      ? 'bg-teal text-white'
+                      : 'bg-page-bg text-text-gray hover:bg-border-def'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+              {viewMode === 'default' && dayParents.length > 1 && (
+                <span className="text-[11px] text-text-muted ml-auto">≡ 길게 눌러 순서 변경</span>
+              )}
             </div>
           )}
         </div>
@@ -245,7 +317,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
         )}
       </main>
 
-      {/* Bottom Bar — TO-DO 탭에서만 표시 */}
+      {/* Bottom Bar */}
       {tab === 'todo' && (
         <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] bg-surface border-t border-border-def px-5 pt-3 pb-4 z-10">
           <button
@@ -258,12 +330,15 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
       )}
 
       {modal === 'addTodo' && (
-        <AddTodoModal tagList={tagList} tagColors={tagColors} onClose={() => setModal(null)} onAdd={(title, opts) => addParent(title, opts)} />
+        <AddTodoModal
+          tagList={tagList} tagColors={tagColors}
+          onClose={() => setModal(null)}
+          onAdd={(title, opts) => addParent(title, opts)}
+        />
       )}
       {editingParent && (
         <AddTodoModal
-          tagList={tagList}
-          tagColors={tagColors}
+          tagList={tagList} tagColors={tagColors}
           onClose={() => setEditingParent(null)}
           initialData={editingParent}
           onEdit={patch => updateParent(editingParent.id, patch)}

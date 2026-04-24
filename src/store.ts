@@ -7,9 +7,9 @@ import type { ParentTodo, SubTodo, MemoItem, Template, UserSettings } from './ty
 const DEFAULT_SETTINGS: UserSettings = { completionMode: 'keep', enableSubTodo: true, viewMode: 'default' }
 const today = () => new Date().toISOString().slice(0, 10)
 
-async function loadAll(phone: string) {
+async function loadAll(uid: string) {
   const keys = ['parents', 'subs', 'memos', 'templates', 'settings', 'meta'] as const
-  const snaps = await Promise.all(keys.map(k => getDoc(doc(db, 'users', phone, 'data', k))))
+  const snaps = await Promise.all(keys.map(k => getDoc(doc(db, 'users', uid, 'data', k))))
   const [p, s, m, t, cfg, meta] = snaps
   return {
     parents:   (p.exists()   ? p.data()?.items   : [])  ?? [] as ParentTodo[],
@@ -22,85 +22,69 @@ async function loadAll(phone: string) {
   }
 }
 
-function useSave<T>(phone: string, key: string, value: T, ready: boolean, asItems = true) {
-  const timer = useRef<ReturnType<typeof setTimeout>>()
-  useEffect(() => {
-    if (!ready) return
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => {
-      setDoc(doc(db, 'users', phone, 'data', key), asItems ? { items: value } : (value as object))
-    }, 800)
-    return () => clearTimeout(timer.current)
-  }, [value, ready])
-}
-
 export function useStore(uid: string) {
-  const phone = uid
   const [loading, setLoading] = useState(true)
-  const [ready, setReady] = useState(false)
-  const [parents, setParents]       = useState<ParentTodo[]>([])
-  const [subs, setSubs]             = useState<SubTodo[]>([])
-  const [memos, setMemos]           = useState<MemoItem[]>([])
-  const [templates, setTemplates]   = useState<Template[]>([])
-  const [tagList, setTagList]       = useState<string[]>([])
-  const [tagColors, setTagColorsState] = useState<Record<string, string>>({})
-  const [settings, setSettings]     = useState<UserSettings>(DEFAULT_SETTINGS)
+  const readyRef = useRef(false)
+
+  const [parents, setParents]         = useState<ParentTodo[]>([])
+  const [subs, setSubs]               = useState<SubTodo[]>([])
+  const [memos, setMemos]             = useState<MemoItem[]>([])
+  const [templates, setTemplates]     = useState<Template[]>([])
+  const [tagList, setTagList]         = useState<string[]>([])
+  const [tagColors, setTagColorsState]= useState<Record<string, string>>({})
+  const [settings, setSettingsState]  = useState<UserSettings>(DEFAULT_SETTINGS)
   const [currentDate, setCurrentDate] = useState<string>(today)
 
-  // Load from Firestore on mount
+  // 초기 로드
   useEffect(() => {
     setLoading(true)
-    loadAll(phone).then(data => {
+    readyRef.current = false
+    loadAll(uid).then(data => {
       setParents(data.parents)
       setSubs(data.subs)
       setMemos(data.memos)
       setTemplates(data.templates)
-      setSettings(data.settings)
+      setSettingsState(data.settings)
       setTagList(data.tagList)
       setTagColorsState(data.tagColors)
       setLoading(false)
-      setReady(true)
+      readyRef.current = true
     })
-  }, [phone])
+  }, [uid])
 
-  // Save to Firestore (debounced 800ms after change)
-  useSave(phone, 'parents',   parents,   ready)
-  useSave(phone, 'subs',      subs,      ready)
-  useSave(phone, 'memos',     memos,     ready)
-  useSave(phone, 'templates', templates, ready)
-  useSave(phone, 'settings',  settings,  ready, false)
+  // 즉시 저장 헬퍼
+  const save = (key: string, value: unknown, asItems = true) => {
+    if (!readyRef.current) return
+    setDoc(
+      doc(db, 'users', uid, 'data', key),
+      asItems ? { items: value } : (value as object)
+    ).catch(console.error)
+  }
 
-  // Save meta (tagList + tagColors) together
-  const metaRef = useRef({ tagList, tagColors })
-  useEffect(() => { metaRef.current = { tagList, tagColors } }, [tagList, tagColors])
-  const metaTimer = useRef<ReturnType<typeof setTimeout>>()
-  useEffect(() => {
-    if (!ready) return
-    clearTimeout(metaTimer.current)
-    metaTimer.current = setTimeout(() => {
-      setDoc(doc(db, 'users', phone, 'data', 'meta'), metaRef.current)
-    }, 800)
-    return () => clearTimeout(metaTimer.current)
-  }, [tagList, tagColors, ready])
+  const saveMeta = (tl: string[], tc: Record<string, string>) => {
+    if (!readyRef.current) return
+    setDoc(doc(db, 'users', uid, 'data', 'meta'), { tagList: tl, tagColors: tc }).catch(console.error)
+  }
 
   // --- Parent ---
   const addParent = (title: string, opts?: { startTime?: string; endTime?: string; description?: string; tag?: string }) => {
     const id = uuidv4()
-    setParents(p => [...p, {
+    const newItem: ParentTodo = {
       id, date: currentDate, title,
       startTime: opts?.startTime, endTime: opts?.endTime,
       description: opts?.description, tag: opts?.tag,
       status: 'todo', sortOrder: Date.now(),
-    }])
+    }
+    setParents(prev => { const next = [...prev, newItem]; save('parents', next); return next })
     return id
   }
 
   const updateParent = (id: string, patch: Partial<ParentTodo>) =>
-    setParents(p => p.map(x => x.id === id ? { ...x, ...patch } : x))
+    setParents(prev => { const next = prev.map(x => x.id === id ? { ...x, ...patch } : x); save('parents', next); return next })
 
   const deleteParent = (id: string) => {
-    setParents(p => p.filter(x => x.id !== id))
-    setSubs(s => s.filter(x => x.parentId !== id))
+    setParents(prev => { const next = prev.filter(x => x.id !== id); save('parents', next); return next })
+    setSubs(prev => { const next = prev.filter(x => x.parentId !== id); save('subs', next); return next })
   }
 
   const toggleParent = (id: string) => {
@@ -111,14 +95,27 @@ export function useStore(uid: string) {
     else updateParent(id, { status: 'done', doneAt: new Date().toISOString() })
   }
 
+  // 드래그 순서 변경 — 한 번의 Firestore 쓰기로 처리
+  const reorderParents = (orderedIds: string[]) => {
+    setParents(prev => {
+      const next = prev.map(p => {
+        const idx = orderedIds.indexOf(p.id)
+        return idx !== -1 ? { ...p, sortOrder: idx * 1000 } : p
+      })
+      save('parents', next)
+      return next
+    })
+  }
+
   // --- Sub ---
   const addSub = (parentId: string, title: string) =>
-    setSubs(s => [...s, { id: uuidv4(), parentId, title, status: 'todo', sortOrder: Date.now() }])
+    setSubs(prev => { const next = [...prev, { id: uuidv4(), parentId, title, status: 'todo' as const, sortOrder: Date.now() }]; save('subs', next); return next })
 
   const updateSub = (id: string, patch: Partial<SubTodo>) =>
-    setSubs(s => s.map(x => x.id === id ? { ...x, ...patch } : x))
+    setSubs(prev => { const next = prev.map(x => x.id === id ? { ...x, ...patch } : x); save('subs', next); return next })
 
-  const deleteSub = (id: string) => setSubs(s => s.filter(x => x.id !== id))
+  const deleteSub = (id: string) =>
+    setSubs(prev => { const next = prev.filter(x => x.id !== id); save('subs', next); return next })
 
   const toggleSub = (id: string) => {
     const sub = subs.find(s => s.id === id)
@@ -134,39 +131,56 @@ export function useStore(uid: string) {
 
   const addMemo = (date: string, content: string) => {
     if (!content.trim()) return
-    setMemos(m => [...m, { id: uuidv4(), date, content, createdAt: new Date().toISOString() }])
+    setMemos(prev => { const next = [...prev, { id: uuidv4(), date, content, createdAt: new Date().toISOString() }]; save('memos', next); return next })
   }
 
   const updateMemo = (id: string, content: string) =>
-    setMemos(m => m.map(x => x.id === id ? { ...x, content } : x))
+    setMemos(prev => { const next = prev.map(x => x.id === id ? { ...x, content } : x); save('memos', next); return next })
 
-  const deleteMemo = (id: string) => setMemos(m => m.filter(x => x.id !== id))
+  const deleteMemo = (id: string) =>
+    setMemos(prev => { const next = prev.filter(x => x.id !== id); save('memos', next); return next })
 
   // --- Tags ---
   const addTag = (name: string) => {
     const t = name.trim()
-    if (t && !tagList.includes(t)) setTagList(l => [...l, t])
+    if (!t || tagList.includes(t)) return
+    const newTagList = [...tagList, t]
+    setTagList(newTagList)
+    saveMeta(newTagList, tagColors)
   }
 
   const deleteTag = (name: string) => {
-    setTagList(l => l.filter(x => x !== name))
-    setTagColorsState(c => { const n = { ...c }; delete n[name]; return n })
-    setParents(p => p.map(x => x.tag === name ? { ...x, tag: undefined } : x))
+    const newTagList = tagList.filter(x => x !== name)
+    const newTagColors = { ...tagColors }
+    delete newTagColors[name]
+    setTagList(newTagList)
+    setTagColorsState(newTagColors)
+    saveMeta(newTagList, newTagColors)
+    setParents(prev => { const next = prev.map(x => x.tag === name ? { ...x, tag: undefined } : x); save('parents', next); return next })
   }
 
-  const setTagColor = (name: string, colorId: string) =>
-    setTagColorsState(c => ({ ...c, [name]: colorId }))
+  const setTagColor = (name: string, colorId: string) => {
+    const newTagColors = { ...tagColors, [name]: colorId }
+    setTagColorsState(newTagColors)
+    saveMeta(tagList, newTagColors)
+  }
 
   const renameTag = (oldName: string, newName: string) => {
     const t = newName.trim()
     if (!t || t === oldName || tagList.includes(t)) return
-    setTagList(l => l.map(x => x === oldName ? t : x))
-    setTagColorsState(c => {
-      const n = { ...c }
-      if (n[oldName]) { n[t] = n[oldName]; delete n[oldName] }
-      return n
-    })
-    setParents(p => p.map(x => x.tag === oldName ? { ...x, tag: t } : x))
+    const newTagList = tagList.map(x => x === oldName ? t : x)
+    const newTagColors = { ...tagColors }
+    if (newTagColors[oldName]) { newTagColors[t] = newTagColors[oldName]; delete newTagColors[oldName] }
+    setTagList(newTagList)
+    setTagColorsState(newTagColors)
+    saveMeta(newTagList, newTagColors)
+    setParents(prev => { const next = prev.map(x => x.tag === oldName ? { ...x, tag: t } : x); save('parents', next); return next })
+  }
+
+  // --- Settings ---
+  const setSettings = (s: UserSettings) => {
+    setSettingsState(s)
+    save('settings', s, false)
   }
 
   // --- Templates ---
@@ -176,28 +190,39 @@ export function useStore(uid: string) {
       startTime: p.startTime, endTime: p.endTime, tag: p.tag,
       subs: subs.filter(s => s.parentId === p.id && s.status === 'todo').map(s => s.title),
     }))
-    setTemplates(t => [...t, { id: uuidv4(), name, parents: tplParents, createdAt: new Date().toISOString() }])
+    setTemplates(prev => { const next = [...prev, { id: uuidv4(), name, parents: tplParents, createdAt: new Date().toISOString() }]; save('templates', next); return next })
   }
 
-  const deleteTemplate = (id: string) => setTemplates(t => t.filter(x => x.id !== id))
+  const deleteTemplate = (id: string) =>
+    setTemplates(prev => { const next = prev.filter(x => x.id !== id); save('templates', next); return next })
 
   const applyTemplate = (templateId: string, mode: 'merge' | 'overwrite', keepTime: boolean) => {
     const tpl = templates.find(t => t.id === templateId)
     if (!tpl) return
+
+    let newParents = [...parents]
+    let newSubs = [...subs]
+
     if (mode === 'overwrite') {
-      const removedIds = parents.filter(p => p.date === currentDate).map(p => p.id)
-      setParents(p => p.filter(x => x.date !== currentDate))
-      setSubs(s => s.filter(x => !removedIds.includes(x.parentId)))
+      const removedIds = newParents.filter(p => p.date === currentDate).map(p => p.id)
+      newParents = newParents.filter(p => p.date !== currentDate)
+      newSubs = newSubs.filter(s => !removedIds.includes(s.parentId))
     }
+
     tpl.parents.forEach(tp => {
       const id = uuidv4()
-      setParents(p => [...p, {
+      newParents = [...newParents, {
         id, date: currentDate, title: tp.title, description: tp.description, tag: tp.tag,
         startTime: keepTime ? tp.startTime : undefined, endTime: keepTime ? tp.endTime : undefined,
         status: 'todo', sortOrder: Date.now() + Math.random(),
-      }])
-      tp.subs.forEach(sub => setSubs(s => [...s, { id: uuidv4(), parentId: id, title: sub, status: 'todo', sortOrder: Date.now() + Math.random() }]))
+      }]
+      tp.subs.forEach(sub => {
+        newSubs = [...newSubs, { id: uuidv4(), parentId: id, title: sub, status: 'todo', sortOrder: Date.now() + Math.random() }]
+      })
     })
+
+    setParents(newParents); save('parents', newParents)
+    setSubs(newSubs); save('subs', newSubs)
   }
 
   const goToToday = () => setCurrentDate(today())
@@ -221,7 +246,6 @@ export function useStore(uid: string) {
         if (aTag !== bTag) return aTag.localeCompare(bTag, 'ko')
         return a.sortOrder - b.sortOrder
       }
-      // default: 추가순 (sortOrder)
       return a.sortOrder - b.sortOrder
     })
 
@@ -244,7 +268,7 @@ export function useStore(uid: string) {
     loading,
     currentDate, setCurrentDate, goToToday,
     dayParents, getSubsFor, markedDates, parents,
-    addParent, updateParent, deleteParent, toggleParent,
+    addParent, updateParent, deleteParent, toggleParent, reorderParents,
     addSub, updateSub, deleteSub, toggleSub,
     memos, getMemosForDate, addMemo, updateMemo, deleteMemo,
     tagList, tagColors, addTag, deleteTag, setTagColor, renameTag,

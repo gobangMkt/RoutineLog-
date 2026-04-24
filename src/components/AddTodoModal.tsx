@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, Clock, ChevronDown, Info } from 'lucide-react'
 import { formatTimeInput, isValidTime } from '../types'
 import type { ParentTodo } from '../types'
@@ -28,11 +28,14 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd, initi
   const [tag, setTag] = useState(initialData?.tag ?? '')
   const [showTagDrop, setShowTagDrop] = useState(false)
   const [showTagTooltip, setShowTagTooltip] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
-  // 배경 스크롤 잠금
+  // 배경 스크롤 잠금 + 콘텐츠 최상단 고정
   useEffect(() => {
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    // iOS Safari: 강제 최상단 스크롤
+    if (scrollRef.current) scrollRef.current.scrollTop = 0
     return () => { document.body.style.overflow = prev }
   }, [])
 
@@ -88,7 +91,7 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd, initi
         </div>
 
         {/* 스크롤 콘텐츠 */}
-        <div className="flex-1 overflow-y-auto overscroll-contain px-6 pb-2">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-6 pb-2">
           {/* 제목 */}
           <div className="mb-4">
             <label className="block text-[14px] font-semibold text-text-dark mb-2">제목</label>
