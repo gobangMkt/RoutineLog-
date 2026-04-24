@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, Trash2, BookTemplate, Download } from 'lucide-react'
 import type { Template, ParentTodo } from '../types'
 import { formatTime } from '../types'
@@ -13,13 +13,48 @@ interface Props {
 }
 
 type View = 'list' | 'save'
+type PendingApply = { id: string; mode: 'merge' | 'overwrite' } | null
 
 export default function TemplateModal({ templates, currentParents, onClose, onSave, onDelete, onApply }: Props) {
   const [view, setView] = useState<View>('list')
   const [name, setName] = useState('')
   const [selectedParents, setSelectedParents] = useState<string[]>(currentParents.map(p => p.id))
-  const [applyMode, setApplyMode] = useState<'merge' | 'overwrite'>('merge')
-  const [keepTime, setKeepTime] = useState(true)
+  const [pendingApply, setPendingApply] = useState<PendingApply>(null)
+
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [sheetY, setSheetY] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const startYRef = useRef(0)
+
+  useEffect(() => {
+    const y = window.scrollY
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${y}px`
+    document.body.style.width = '100%'
+    document.body.style.overflowY = 'scroll'
+    return () => {
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.width = ''
+      document.body.style.overflowY = ''
+      window.scrollTo(0, y)
+    }
+  }, [])
+
+  const onHandlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    setIsDragging(true)
+    startYRef.current = e.clientY
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  const onHandlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return
+    setSheetY(Math.max(0, e.clientY - startYRef.current))
+  }
+  const onHandlePointerUp = () => {
+    setIsDragging(false)
+    if (sheetY > 100) onClose()
+    else setSheetY(0)
+  }
 
   const toggleParent = (id: string) =>
     setSelectedParents(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
@@ -31,93 +66,130 @@ export default function TemplateModal({ templates, currentParents, onClose, onSa
     }
   }
 
+  const handleApply = (keepTime: boolean) => {
+    if (!pendingApply) return
+    onApply(pendingApply.id, pendingApply.mode, keepTime)
+    onClose()
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onClose}>
       <div
-        className="w-full max-w-[480px] bg-surface rounded-[20px_20px_0_0] px-6 pt-6 pb-8 slide-up max-h-[80vh] flex flex-col"
+        className="w-full max-w-[480px] bg-surface rounded-t-[20px] flex flex-col slide-up"
+        style={{
+          maxHeight: '85vh',
+          transform: `translateY(${sheetY}px)`,
+          transition: isDragging ? 'none' : 'transform 0.25s ease',
+        }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Handle */}
-        <div className="w-10 h-1 bg-border-def rounded-full mx-auto mb-5" />
+        {/* 드래그 핸들 */}
+        <div
+          className="w-10 h-1.5 bg-border-def rounded-full mx-auto mt-4 flex-shrink-0 cursor-grab active:cursor-grabbing touch-none"
+          onPointerDown={onHandlePointerDown}
+          onPointerMove={onHandlePointerMove}
+          onPointerUp={onHandlePointerUp}
+          onPointerCancel={onHandlePointerUp}
+        />
 
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4 flex-shrink-0">
+        {/* 헤더 */}
+        <div className="flex items-center justify-between px-6 pt-4 pb-0 flex-shrink-0">
           <h2 className="text-[20px] font-bold text-text-dark">템플릿</h2>
           <button onClick={onClose} className="p-1 rounded-[8px] hover:bg-page-bg">
             <X size={20} className="text-text-gray" />
           </button>
         </div>
 
-        {/* Tab toggle */}
-        <div className="flex gap-2 mb-4 flex-shrink-0">
+        {/* 탭 */}
+        <div className="flex gap-2 px-6 pt-4 pb-3 flex-shrink-0">
           <button
-            onClick={() => setView('list')}
+            onClick={() => { setView('list'); setPendingApply(null) }}
             className={`flex-1 py-2.5 rounded-[10px] text-[14px] font-semibold transition-colors flex items-center justify-center gap-1 ${
               view === 'list' ? 'bg-teal text-white' : 'bg-page-bg text-text-gray hover:bg-border-def'
             }`}
           >
-            <Download size={14} />불러오기
+            <Download size={14} /> 불러오기
           </button>
           <button
-            onClick={() => setView('save')}
+            onClick={() => { setView('save'); setPendingApply(null) }}
             className={`flex-1 py-2.5 rounded-[10px] text-[14px] font-semibold transition-colors flex items-center justify-center gap-1 ${
               view === 'save' ? 'bg-teal text-white' : 'bg-page-bg text-text-gray hover:bg-border-def'
             }`}
           >
-            <BookTemplate size={14} />저장하기
+            <BookTemplate size={14} /> 저장하기
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1">
+        <div ref={scrollRef} className="overflow-y-auto overscroll-contain flex-1 px-6 pb-8">
           {view === 'list' ? (
             <>
-              {/* Apply options */}
-              <div className="bg-teal-light border-[1.5px] border-teal-border rounded-[10px] px-4 py-3 mb-4 flex items-center gap-4">
-                <div className="flex-1">
-                  <p className="text-[12px] text-text-gray mb-2">적용 방식</p>
-                  <div className="flex gap-2">
-                    {(['merge', 'overwrite'] as const).map(m => (
-                      <button
-                        key={m}
-                        onClick={() => setApplyMode(m)}
-                        className={`text-[13px] px-3 py-1.5 rounded-[8px] font-semibold transition-colors ${
-                          applyMode === m ? 'bg-teal text-white' : 'bg-surface text-text-gray border border-border-def'
-                        }`}
-                      >
-                        {m === 'merge' ? '합치기' : '덮어쓰기'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <label className="flex items-center gap-2 cursor-pointer flex-shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={keepTime}
-                    onChange={e => setKeepTime(e.target.checked)}
-                    className="w-4 h-4 accent-teal"
-                  />
-                  <span className="text-[13px] text-text-body">시간 유지</span>
-                </label>
-              </div>
-
               {templates.length === 0 ? (
                 <p className="text-center text-text-gray text-[14px] py-8">저장된 템플릿이 없습니다</p>
               ) : (
                 templates.map(t => (
-                  <div key={t.id} className="flex items-center gap-3 px-4 py-3 rounded-[10px] border-[1.5px] border-border-def mb-2 hover:border-teal hover:bg-teal-sel transition-colors">
-                    <div className="flex-1">
-                      <p className="text-[14px] font-semibold text-text-dark">{t.name}</p>
-                      <p className="text-[12px] text-text-gray mt-0.5">{t.parents.length}개 투두 묶음</p>
+                  <div key={t.id} className="mb-2">
+                    {/* 템플릿 행 */}
+                    <div className={`flex items-center gap-2 px-4 py-3 rounded-[10px] border-[1.5px] transition-colors ${
+                      pendingApply?.id === t.id ? 'border-teal bg-teal-sel' : 'border-border-def hover:border-teal hover:bg-teal-sel'
+                    }`}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-semibold text-text-dark truncate">{t.name}</p>
+                        <p className="text-[12px] text-text-gray mt-0.5">{t.parents.length}개 투두 묶음</p>
+                      </div>
+                      <button
+                        onClick={() => setPendingApply(pendingApply?.id === t.id && pendingApply.mode === 'merge' ? null : { id: t.id, mode: 'merge' })}
+                        className={`text-[13px] font-semibold px-3 py-1.5 rounded-[8px] transition-colors flex-shrink-0 ${
+                          pendingApply?.id === t.id && pendingApply.mode === 'merge'
+                            ? 'bg-teal text-white'
+                            : 'bg-teal-light text-teal hover:bg-teal-border'
+                        }`}
+                      >
+                        합치기
+                      </button>
+                      <button
+                        onClick={() => setPendingApply(pendingApply?.id === t.id && pendingApply.mode === 'overwrite' ? null : { id: t.id, mode: 'overwrite' })}
+                        className={`text-[13px] font-semibold px-3 py-1.5 rounded-[8px] transition-colors flex-shrink-0 ${
+                          pendingApply?.id === t.id && pendingApply.mode === 'overwrite'
+                            ? 'bg-teal text-white'
+                            : 'bg-page-bg text-text-body border border-border-def hover:border-teal'
+                        }`}
+                      >
+                        덮어쓰기
+                      </button>
+                      <button onClick={() => { onDelete(t.id); if (pendingApply?.id === t.id) setPendingApply(null) }}
+                        className="p-1.5 hover:bg-error-bg rounded-[6px] flex-shrink-0">
+                        <Trash2 size={14} className="text-error" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => { onApply(t.id, applyMode, keepTime); onClose() }}
-                      className="text-[13px] font-semibold bg-teal text-white px-3 py-1.5 rounded-[8px] hover:bg-teal-hover transition-colors"
-                    >
-                      적용
-                    </button>
-                    <button onClick={() => onDelete(t.id)} className="p-1.5 hover:bg-error-bg rounded-[6px]">
-                      <Trash2 size={14} className="text-error" />
-                    </button>
+
+                    {/* 시간 유지 확인 (인라인) */}
+                    {pendingApply?.id === t.id && (
+                      <div className="mt-1 bg-page-bg rounded-[10px] px-4 py-3">
+                        <p className="text-[13px] font-semibold text-text-dark mb-2.5">
+                          시간을 유지할까요?
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleApply(true)}
+                            className="flex-1 py-2 rounded-[8px] bg-teal text-white text-[13px] font-semibold"
+                          >
+                            시간 유지
+                          </button>
+                          <button
+                            onClick={() => handleApply(false)}
+                            className="flex-1 py-2 rounded-[8px] bg-surface text-text-body text-[13px] font-semibold border border-border-def"
+                          >
+                            시간 제외
+                          </button>
+                          <button
+                            onClick={() => setPendingApply(null)}
+                            className="px-3 py-2 rounded-[8px] text-text-gray text-[13px] hover:bg-border-def"
+                          >
+                            취소
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -128,6 +200,7 @@ export default function TemplateModal({ templates, currentParents, onClose, onSa
                 <label className="block text-[14px] font-semibold text-text-dark mb-2">템플릿 이름</label>
                 <input
                   autoFocus value={name} onChange={e => setName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSave()}
                   placeholder="예: 평일 루틴"
                   className="w-full px-4 py-[14px] border-[1.5px] border-border-def focus:border-teal rounded-[10px] text-[15px] text-text-dark outline-none transition-colors placeholder:text-text-muted"
                 />
