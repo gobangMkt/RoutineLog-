@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X, Plus, Trash2, Tag, ChevronRight, ChevronLeft, Check, Pencil } from 'lucide-react'
-import type { UserSettings, CompletionMode, ViewMode } from '../types'
+import type { UserSettings, CompletionMode } from '../types'
 import { getTagColor, TAG_COLORS } from './TagManageModal'
 
 interface Props {
@@ -19,12 +19,6 @@ const modes: { value: CompletionMode; label: string; desc: string }[] = [
   { value: 'keep', label: '유지 (기본)', desc: '완료해도 리스트에 남아요. 취소선으로 표시.' },
   { value: 'hide', label: '숨김', desc: '완료 항목을 화면에서 숨깁니다. 데이터는 유지.' },
   { value: 'delete', label: '삭제', desc: '완료 즉시 항목이 삭제됩니다.' },
-]
-
-const viewModes: { value: ViewMode; label: string; desc: string }[] = [
-  { value: 'default', label: '추가순', desc: 'TO-DO를 추가한 순서로 표시합니다.' },
-  { value: 'time', label: '시간순', desc: '이른 시간 → 늦은 시간 순으로 정렬합니다.' },
-  { value: 'tag', label: '태그별', desc: '같은 태그끼리 묶어서 표시합니다.' },
 ]
 
 type View = 'main' | 'tags'
@@ -188,25 +182,6 @@ export default function SettingsModal({ settings, tagList, tagColors, onClose, o
                 >
                   <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.enableSubTodo ? 'left-6' : 'left-1'}`} />
                 </button>
-              </div>
-
-              {/* View mode */}
-              <p className="text-[13px] font-semibold text-text-gray mb-2 tracking-[0.3px]">TO-DO 보기 방식</p>
-              <div className="space-y-2 mb-5">
-                {viewModes.map(m => (
-                  <button
-                    key={m.value}
-                    onClick={() => onUpdate({ ...settings, viewMode: m.value })}
-                    className={`w-full px-4 py-3 rounded-[10px] border-[1.5px] text-left transition-colors ${
-                      (settings.viewMode ?? 'default') === m.value
-                        ? 'border-teal bg-teal-sel'
-                        : 'border-border-def bg-page-bg hover:border-text-gray'
-                    }`}
-                  >
-                    <p className={`text-[14px] font-semibold ${(settings.viewMode ?? 'default') === m.value ? 'text-teal' : 'text-text-dark'}`}>{m.label}</p>
-                    <p className="text-[13px] text-text-gray mt-0.5">{m.desc}</p>
-                  </button>
-                ))}
               </div>
 
               {/* Completion mode */}

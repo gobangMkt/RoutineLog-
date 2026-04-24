@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { onAuthStateChanged } from 'firebase/auth'
+import { auth } from './firebase'
 import { Plus, StickyNote, CheckSquare, Settings, BookTemplate, LogOut } from 'lucide-react'
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor,
@@ -10,7 +12,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useStore } from './store'
-import { getSession, clearSession } from './auth'
+import { clearSession } from './auth'
 import type { ParentTodo } from './types'
 import type { ViewMode } from './types'
 import AuthScreen from './components/AuthScreen'
@@ -56,6 +58,11 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
   const [tab, setTab] = useState<Tab>('todo')
   const [modal, setModal] = useState<Modal>(null)
   const [editingParent, setEditingParent] = useState<ParentTodo | null>(null)
+  const [blockAddBtn, setBlockAddBtn] = useState(false)
+
+  // 모달 닫힌 직후 고스트 클릭으로 하단 버튼이 눌리는 것 방지
+  const closeModal = () => { setModal(null); setBlockAddBtn(true); setTimeout(() => setBlockAddBtn(false), 600) }
+  const closeEditing = () => { setEditingParent(null); setBlockAddBtn(true); setTimeout(() => setBlockAddBtn(false), 600) }
 
   const {
     currentDate, setCurrentDate, goToToday,
@@ -66,6 +73,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
     tagList, tagColors, addTag, deleteTag, setTagColor, renameTag,
     templates, saveTemplate, deleteTemplate, applyTemplate,
     settings, setSettings,
+    saveError, clearSaveError,
   } = store
 
   const sensors = useSensors(
@@ -80,6 +88,22 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
       </div>
       <p className="text-[15px] font-semibold text-text-dark">루틴로그</p>
       <p className="text-[13px] text-text-gray">데이터를 불러오는 중...</p>
+    </div>
+  )
+
+  if (store.loadError) return (
+    <div className="min-h-screen bg-page-bg flex flex-col items-center justify-center gap-4 px-6">
+      <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
+        <span className="text-2xl">⚠️</span>
+      </div>
+      <p className="text-[15px] font-semibold text-text-dark text-center">데이터 로드 실패</p>
+      <p className="text-[13px] text-red-500 text-center break-all">{store.loadError}</p>
+      <button
+        onClick={() => window.location.reload()}
+        className="px-5 py-2.5 rounded-[10px] bg-teal text-white text-[14px] font-semibold"
+      >
+        다시 시도
+      </button>
     </div>
   )
 
@@ -196,6 +220,19 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
 
   return (
     <div className="min-h-screen bg-page-bg w-full overflow-x-hidden">
+      {/* 저장 오류 토스트 */}
+      {saveError && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-32px)] max-w-[440px]">
+          <div className="bg-red-50 border border-red-200 rounded-[12px] px-4 py-3 flex items-start gap-3 shadow-md">
+            <span className="text-lg leading-none mt-0.5">⚠️</span>
+            <div className="flex-1">
+              <p className="text-[13px] font-semibold text-red-700">저장 실패 — 새로고침해도 데이터가 사라집니다</p>
+              <p className="text-[12px] text-red-500 mt-0.5 break-all">{saveError}</p>
+            </div>
+            <button onClick={clearSaveError} className="text-red-400 hover:text-red-600 text-lg leading-none">✕</button>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <header className="sticky top-0 z-20 bg-surface border-b border-border-def w-full">
         <div className="max-w-[480px] mx-auto px-5 pt-5 pb-0 flex items-center justify-between">
@@ -321,7 +358,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
       {tab === 'todo' && (
         <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] bg-surface border-t border-border-def px-5 pt-3 pb-4 z-10">
           <button
-            onClick={() => setModal('addTodo')}
+            onClick={() => !blockAddBtn && setModal('addTodo')}
             className="w-full flex items-center justify-center gap-2 py-[15px] rounded-[10px] bg-teal text-white text-[16px] font-bold hover:bg-teal-hover active:scale-[0.98] transition-all"
           >
             <Plus size={20} strokeWidth={2.5} /> TO-DO 추가
@@ -332,14 +369,14 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
       {modal === 'addTodo' && (
         <AddTodoModal
           tagList={tagList} tagColors={tagColors}
-          onClose={() => setModal(null)}
+          onClose={closeModal}
           onAdd={(title, opts) => addParent(title, opts)}
         />
       )}
       {editingParent && (
         <AddTodoModal
           tagList={tagList} tagColors={tagColors}
-          onClose={() => setEditingParent(null)}
+          onClose={closeEditing}
           initialData={editingParent}
           onEdit={patch => updateParent(editingParent.id, patch)}
         />
@@ -372,7 +409,32 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
 }
 
 export default function App() {
-  const [session, setSession] = useState<{ phone: string; uid: string } | null>(() => getSession())
-  if (!session) return <AuthScreen onLogin={setSession} />
-  return <MainApp phone={session.phone} uid={session.uid} />
+  const [authLoading, setAuthLoading] = useState(true)
+  const [user, setUser] = useState<{ uid: string; phone: string } | null>(null)
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        const phone = localStorage.getItem('rl_phone') ?? ''
+        setUser({ uid: firebaseUser.uid, phone })
+      } else {
+        setUser(null)
+      }
+      setAuthLoading(false)
+    })
+    return () => unsub()
+  }, [])
+
+  if (authLoading) return (
+    <div className="min-h-screen bg-page-bg flex flex-col items-center justify-center gap-3">
+      <div className="w-14 h-14 rounded-full bg-teal-light flex items-center justify-center">
+        <span className="text-2xl">📋</span>
+      </div>
+      <p className="text-[15px] font-semibold text-text-dark">루틴로그</p>
+      <p className="text-[13px] text-text-gray">인증 확인 중...</p>
+    </div>
+  )
+
+  if (!user) return <AuthScreen onLogin={s => setUser(s)} />
+  return <MainApp phone={user.phone} uid={user.uid} />
 }

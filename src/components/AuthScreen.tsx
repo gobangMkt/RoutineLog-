@@ -46,7 +46,7 @@ export default function AuthScreen({ onLogin }: Props) {
     try {
       await login(phone, password)
       const normalized = normalizePhone(phone)
-      const uid = sessionStorage.getItem('rl_uid')!
+      const uid = localStorage.getItem('rl_uid')!
       onLogin({ phone: normalized, uid })
     } catch (e) {
       setError((e as Error).message === 'Firebase: Error (auth/invalid-credential).'
@@ -64,7 +64,7 @@ export default function AuthScreen({ onLogin }: Props) {
     try {
       await register(phone, password)
       const normalized = normalizePhone(phone)
-      const uid = sessionStorage.getItem('rl_uid')!
+      const uid = localStorage.getItem('rl_uid')!
       onLogin({ phone: normalized, uid })
     } catch (e) {
       setError((e as Error).message)

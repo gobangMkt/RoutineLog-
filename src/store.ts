@@ -7,39 +7,71 @@ import type { ParentTodo, SubTodo, MemoItem, Template, UserSettings } from './ty
 const DEFAULT_SETTINGS: UserSettings = { completionMode: 'keep', enableSubTodo: true, viewMode: 'default' }
 const today = () => new Date().toISOString().slice(0, 10)
 
+// Firestore는 undefined 값을 허용하지 않으므로 undefined 필드를 재귀적으로 제거
+function stripUndefined<T>(obj: T): T {
+  if (Array.isArray(obj)) return obj.map(stripUndefined) as unknown as T
+  if (obj !== null && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj as object)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, stripUndefined(v)])
+    ) as T
+  }
+  return obj
+}
+
 async function loadAll(uid: string) {
   const keys = ['parents', 'subs', 'memos', 'templates', 'settings', 'meta'] as const
   const snaps = await Promise.all(keys.map(k => getDoc(doc(db, 'users', uid, 'data', k))))
   const [p, s, m, t, cfg, meta] = snaps
   return {
-    parents:   (p.exists()   ? p.data()?.items   : [])  ?? [] as ParentTodo[],
-    subs:      (s.exists()   ? s.data()?.items   : [])  ?? [] as SubTodo[],
-    memos:     (m.exists()   ? m.data()?.items   : [])  ?? [] as MemoItem[],
-    templates: (t.exists()   ? t.data()?.items   : [])  ?? [] as Template[],
+    parents:   (p.exists()   ? p.data()?.items : [])  ?? [] as ParentTodo[],
+    subs:      (s.exists()   ? s.data()?.items : [])  ?? [] as SubTodo[],
+    memos:     (m.exists()   ? m.data()?.items : [])  ?? [] as MemoItem[],
+    templates: (t.exists()   ? t.data()?.items : [])  ?? [] as Template[],
     settings:  cfg.exists()  ? { ...DEFAULT_SETTINGS, ...cfg.data() } : DEFAULT_SETTINGS,
-    tagList:   (meta.exists() ? meta.data()?.tagList   : [])  ?? [] as string[],
-    tagColors: (meta.exists() ? meta.data()?.tagColors : {})  ?? {} as Record<string, string>,
+    tagList:   (meta.exists() ? meta.data()?.tagList   : []) ?? [] as string[],
+    tagColors: (meta.exists() ? meta.data()?.tagColors : {}) ?? {} as Record<string, string>,
   }
 }
 
 export function useStore(uid: string) {
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const readyRef = useRef(false)
 
-  const [parents, setParents]         = useState<ParentTodo[]>([])
-  const [subs, setSubs]               = useState<SubTodo[]>([])
-  const [memos, setMemos]             = useState<MemoItem[]>([])
-  const [templates, setTemplates]     = useState<Template[]>([])
-  const [tagList, setTagList]         = useState<string[]>([])
-  const [tagColors, setTagColorsState]= useState<Record<string, string>>({})
-  const [settings, setSettingsState]  = useState<UserSettings>(DEFAULT_SETTINGS)
-  const [currentDate, setCurrentDate] = useState<string>(today)
+  const [parents, setParents]          = useState<ParentTodo[]>([])
+  const [subs, setSubs]                = useState<SubTodo[]>([])
+  const [memos, setMemos]              = useState<MemoItem[]>([])
+  const [templates, setTemplates]      = useState<Template[]>([])
+  const [tagList, setTagList]          = useState<string[]>([])
+  const [tagColors, setTagColorsState] = useState<Record<string, string>>({})
+  const [settings, setSettingsState]   = useState<UserSettings>(DEFAULT_SETTINGS)
+  const [currentDate, setCurrentDate]  = useState<string>(today)
 
-  // 초기 로드
+  // 매 렌더마다 최신 상태를 ref에 동기화 (setState 바깥에서 save할 때 사용)
+  const parentsRef  = useRef(parents)
+  const subsRef     = useRef(subs)
+  const memosRef    = useRef(memos)
+  const templatesRef= useRef(templates)
+  const tagListRef  = useRef(tagList)
+  const tagColorsRef= useRef(tagColors)
+  parentsRef.current  = parents
+  subsRef.current     = subs
+  memosRef.current    = memos
+  templatesRef.current= templates
+  tagListRef.current  = tagList
+  tagColorsRef.current= tagColors
+
+  // 초기 로드 — App 레벨에서 이미 Firebase Auth 확인 완료 후 진입하므로 바로 로드
   useEffect(() => {
     setLoading(true)
     readyRef.current = false
+    let cancelled = false
+
     loadAll(uid).then(data => {
+      if (cancelled) return
       setParents(data.parents)
       setSubs(data.subs)
       setMemos(data.memos)
@@ -49,21 +81,41 @@ export function useStore(uid: string) {
       setTagColorsState(data.tagColors)
       setLoading(false)
       readyRef.current = true
+    }).catch(err => {
+      if (cancelled) return
+      console.error('Firestore 로드 실패:', err)
+      setLoadError(err?.code === 'permission-denied'
+        ? '권한 오류: Firebase 보안 규칙을 확인하세요'
+        : `로드 실패: ${err?.message ?? err}`)
+      setLoading(false)
+      readyRef.current = true  // 로드 실패해도 저장 시도는 허용
     })
+
+    return () => { cancelled = true; readyRef.current = false }
   }, [uid])
 
-  // 즉시 저장 헬퍼
+  // 저장 헬퍼 — 로드 완료 후에만 저장 (덮어쓰기 방지)
   const save = (key: string, value: unknown, asItems = true) => {
     if (!readyRef.current) return
     setDoc(
       doc(db, 'users', uid, 'data', key),
-      asItems ? { items: value } : (value as object)
-    ).catch(console.error)
+      stripUndefined(asItems ? { items: value } : (value as object))
+    ).catch(err => {
+      console.error(`save(${key}) 실패:`, err)
+      setSaveError(err?.code === 'permission-denied'
+        ? 'Firebase 권한 오류: 보안 규칙을 확인하세요. 데이터가 저장되지 않습니다.'
+        : `저장 실패: ${err?.message ?? err}`)
+    })
   }
 
   const saveMeta = (tl: string[], tc: Record<string, string>) => {
     if (!readyRef.current) return
-    setDoc(doc(db, 'users', uid, 'data', 'meta'), { tagList: tl, tagColors: tc }).catch(console.error)
+    setDoc(doc(db, 'users', uid, 'data', 'meta'), stripUndefined({ tagList: tl, tagColors: tc })).catch(err => {
+      console.error('saveMeta 실패:', err)
+      setSaveError(err?.code === 'permission-denied'
+        ? 'Firebase 권한 오류: 보안 규칙을 확인하세요. 데이터가 저장되지 않습니다.'
+        : `저장 실패: ${err?.message ?? err}`)
+    })
   }
 
   // --- Parent ---
@@ -75,50 +127,65 @@ export function useStore(uid: string) {
       description: opts?.description, tag: opts?.tag,
       status: 'todo', sortOrder: Date.now(),
     }
-    setParents(prev => { const next = [...prev, newItem]; save('parents', next); return next })
+    const next = [...parentsRef.current, newItem]
+    setParents(next)
+    save('parents', next)
     return id
   }
 
-  const updateParent = (id: string, patch: Partial<ParentTodo>) =>
-    setParents(prev => { const next = prev.map(x => x.id === id ? { ...x, ...patch } : x); save('parents', next); return next })
+  const updateParent = (id: string, patch: Partial<ParentTodo>) => {
+    const next = parentsRef.current.map(x => x.id === id ? { ...x, ...patch } : x)
+    setParents(next)
+    save('parents', next)
+  }
 
   const deleteParent = (id: string) => {
-    setParents(prev => { const next = prev.filter(x => x.id !== id); save('parents', next); return next })
-    setSubs(prev => { const next = prev.filter(x => x.parentId !== id); save('subs', next); return next })
+    const nextParents = parentsRef.current.filter(x => x.id !== id)
+    const nextSubs    = subsRef.current.filter(x => x.parentId !== id)
+    setParents(nextParents)
+    setSubs(nextSubs)
+    save('parents', nextParents)
+    save('subs', nextSubs)
   }
 
   const toggleParent = (id: string) => {
-    const parent = parents.find(p => p.id === id)
+    const parent = parentsRef.current.find(p => p.id === id)
     if (!parent) return
     if (parent.status === 'done') { updateParent(id, { status: 'todo', doneAt: undefined }); return }
     if (settings.completionMode === 'delete') deleteParent(id)
     else updateParent(id, { status: 'done', doneAt: new Date().toISOString() })
   }
 
-  // 드래그 순서 변경 — 한 번의 Firestore 쓰기로 처리
   const reorderParents = (orderedIds: string[]) => {
-    setParents(prev => {
-      const next = prev.map(p => {
-        const idx = orderedIds.indexOf(p.id)
-        return idx !== -1 ? { ...p, sortOrder: idx * 1000 } : p
-      })
-      save('parents', next)
-      return next
+    const next = parentsRef.current.map(p => {
+      const idx = orderedIds.indexOf(p.id)
+      return idx !== -1 ? { ...p, sortOrder: idx * 1000 } : p
     })
+    setParents(next)
+    save('parents', next)
   }
 
   // --- Sub ---
-  const addSub = (parentId: string, title: string) =>
-    setSubs(prev => { const next = [...prev, { id: uuidv4(), parentId, title, status: 'todo' as const, sortOrder: Date.now() }]; save('subs', next); return next })
+  const addSub = (parentId: string, title: string) => {
+    const next = [...subsRef.current, { id: uuidv4(), parentId, title, status: 'todo' as const, sortOrder: Date.now() }]
+    setSubs(next)
+    save('subs', next)
+  }
 
-  const updateSub = (id: string, patch: Partial<SubTodo>) =>
-    setSubs(prev => { const next = prev.map(x => x.id === id ? { ...x, ...patch } : x); save('subs', next); return next })
+  const updateSub = (id: string, patch: Partial<SubTodo>) => {
+    const next = subsRef.current.map(x => x.id === id ? { ...x, ...patch } : x)
+    setSubs(next)
+    save('subs', next)
+  }
 
-  const deleteSub = (id: string) =>
-    setSubs(prev => { const next = prev.filter(x => x.id !== id); save('subs', next); return next })
+  const deleteSub = (id: string) => {
+    const next = subsRef.current.filter(x => x.id !== id)
+    setSubs(next)
+    save('subs', next)
+  }
 
   const toggleSub = (id: string) => {
-    const sub = subs.find(s => s.id === id)
+    const sub = subsRef.current.find(s => s.id === id)
     if (!sub) return
     if (sub.status === 'done') { updateSub(id, { status: 'todo', doneAt: undefined }); return }
     if (settings.completionMode === 'delete') deleteSub(id)
@@ -131,50 +198,62 @@ export function useStore(uid: string) {
 
   const addMemo = (date: string, content: string) => {
     if (!content.trim()) return
-    setMemos(prev => { const next = [...prev, { id: uuidv4(), date, content, createdAt: new Date().toISOString() }]; save('memos', next); return next })
+    const next = [...memosRef.current, { id: uuidv4(), date, content, createdAt: new Date().toISOString() }]
+    setMemos(next)
+    save('memos', next)
   }
 
-  const updateMemo = (id: string, content: string) =>
-    setMemos(prev => { const next = prev.map(x => x.id === id ? { ...x, content } : x); save('memos', next); return next })
+  const updateMemo = (id: string, content: string) => {
+    const next = memosRef.current.map(x => x.id === id ? { ...x, content } : x)
+    setMemos(next)
+    save('memos', next)
+  }
 
-  const deleteMemo = (id: string) =>
-    setMemos(prev => { const next = prev.filter(x => x.id !== id); save('memos', next); return next })
+  const deleteMemo = (id: string) => {
+    const next = memosRef.current.filter(x => x.id !== id)
+    setMemos(next)
+    save('memos', next)
+  }
 
   // --- Tags ---
   const addTag = (name: string) => {
     const t = name.trim()
-    if (!t || tagList.includes(t)) return
-    const newTagList = [...tagList, t]
-    setTagList(newTagList)
-    saveMeta(newTagList, tagColors)
+    if (!t || tagListRef.current.includes(t)) return
+    const next = [...tagListRef.current, t]
+    setTagList(next)
+    saveMeta(next, tagColorsRef.current)
   }
 
   const deleteTag = (name: string) => {
-    const newTagList = tagList.filter(x => x !== name)
-    const newTagColors = { ...tagColors }
+    const newTagList   = tagListRef.current.filter(x => x !== name)
+    const newTagColors = { ...tagColorsRef.current }
     delete newTagColors[name]
     setTagList(newTagList)
     setTagColorsState(newTagColors)
     saveMeta(newTagList, newTagColors)
-    setParents(prev => { const next = prev.map(x => x.tag === name ? { ...x, tag: undefined } : x); save('parents', next); return next })
+    const nextParents = parentsRef.current.map(x => x.tag === name ? { ...x, tag: undefined } : x)
+    setParents(nextParents)
+    save('parents', nextParents)
   }
 
   const setTagColor = (name: string, colorId: string) => {
-    const newTagColors = { ...tagColors, [name]: colorId }
-    setTagColorsState(newTagColors)
-    saveMeta(tagList, newTagColors)
+    const next = { ...tagColorsRef.current, [name]: colorId }
+    setTagColorsState(next)
+    saveMeta(tagListRef.current, next)
   }
 
   const renameTag = (oldName: string, newName: string) => {
     const t = newName.trim()
-    if (!t || t === oldName || tagList.includes(t)) return
-    const newTagList = tagList.map(x => x === oldName ? t : x)
-    const newTagColors = { ...tagColors }
+    if (!t || t === oldName || tagListRef.current.includes(t)) return
+    const newTagList   = tagListRef.current.map(x => x === oldName ? t : x)
+    const newTagColors = { ...tagColorsRef.current }
     if (newTagColors[oldName]) { newTagColors[t] = newTagColors[oldName]; delete newTagColors[oldName] }
     setTagList(newTagList)
     setTagColorsState(newTagColors)
     saveMeta(newTagList, newTagColors)
-    setParents(prev => { const next = prev.map(x => x.tag === oldName ? { ...x, tag: t } : x); save('parents', next); return next })
+    const nextParents = parentsRef.current.map(x => x.tag === oldName ? { ...x, tag: t } : x)
+    setParents(nextParents)
+    save('parents', nextParents)
   }
 
   // --- Settings ---
@@ -185,28 +264,33 @@ export function useStore(uid: string) {
 
   // --- Templates ---
   const saveTemplate = (name: string, parentIds: string[]) => {
-    const tplParents = parents.filter(p => parentIds.includes(p.id)).map(p => ({
+    const tplParents = parentsRef.current.filter(p => parentIds.includes(p.id)).map(p => ({
       title: p.title, description: p.description,
       startTime: p.startTime, endTime: p.endTime, tag: p.tag,
-      subs: subs.filter(s => s.parentId === p.id && s.status === 'todo').map(s => s.title),
+      subs: subsRef.current.filter(s => s.parentId === p.id && s.status === 'todo').map(s => s.title),
     }))
-    setTemplates(prev => { const next = [...prev, { id: uuidv4(), name, parents: tplParents, createdAt: new Date().toISOString() }]; save('templates', next); return next })
+    const next = [...templatesRef.current, { id: uuidv4(), name, parents: tplParents, createdAt: new Date().toISOString() }]
+    setTemplates(next)
+    save('templates', next)
   }
 
-  const deleteTemplate = (id: string) =>
-    setTemplates(prev => { const next = prev.filter(x => x.id !== id); save('templates', next); return next })
+  const deleteTemplate = (id: string) => {
+    const next = templatesRef.current.filter(x => x.id !== id)
+    setTemplates(next)
+    save('templates', next)
+  }
 
   const applyTemplate = (templateId: string, mode: 'merge' | 'overwrite', keepTime: boolean) => {
-    const tpl = templates.find(t => t.id === templateId)
+    const tpl = templatesRef.current.find(t => t.id === templateId)
     if (!tpl) return
 
-    let newParents = [...parents]
-    let newSubs = [...subs]
+    let newParents = [...parentsRef.current]
+    let newSubs    = [...subsRef.current]
 
     if (mode === 'overwrite') {
       const removedIds = newParents.filter(p => p.date === currentDate).map(p => p.id)
       newParents = newParents.filter(p => p.date !== currentDate)
-      newSubs = newSubs.filter(s => !removedIds.includes(s.parentId))
+      newSubs    = newSubs.filter(s => !removedIds.includes(s.parentId))
     }
 
     tpl.parents.forEach(tp => {
@@ -222,7 +306,7 @@ export function useStore(uid: string) {
     })
 
     setParents(newParents); save('parents', newParents)
-    setSubs(newSubs); save('subs', newSubs)
+    setSubs(newSubs);       save('subs', newSubs)
   }
 
   const goToToday = () => setCurrentDate(today())
@@ -250,7 +334,8 @@ export function useStore(uid: string) {
     })
 
   const getSubsFor = (parentId: string) =>
-    subs.filter(s => s.parentId === parentId)
+    subs
+      .filter(s => s.parentId === parentId)
       .filter(s => settings.completionMode === 'hide' ? s.status !== 'done' : true)
       .sort((a, b) => a.sortOrder - b.sortOrder)
 
@@ -265,7 +350,7 @@ export function useStore(uid: string) {
   })
 
   return {
-    loading,
+    loading, loadError, saveError, clearSaveError: () => setSaveError(null),
     currentDate, setCurrentDate, goToToday,
     dayParents, getSubsFor, markedDates, parents,
     addParent, updateParent, deleteParent, toggleParent, reorderParents,

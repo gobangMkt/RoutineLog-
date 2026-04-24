@@ -68,7 +68,7 @@ export default function ParentCard({
             {...dragHandleProps}
             className="flex-shrink-0 cursor-grab active:cursor-grabbing touch-none p-1"
           >
-            <GripVertical size={15} className="text-border-def" />
+            <GripVertical size={17} className="text-border-def" />
           </div>
         )}
 
@@ -79,7 +79,7 @@ export default function ParentCard({
             timeLabel ? 'bg-teal-light text-teal' : 'bg-page-bg text-text-gray hover:bg-border-def'
           }`}
         >
-          <Clock size={11} />
+          <Clock size={13} />
           <span className="whitespace-nowrap">{timeLabel ?? '시간'}</span>
         </button>
 
@@ -87,27 +87,29 @@ export default function ParentCard({
         <div className="relative flex-shrink-0">
           <button
             onClick={() => setShowTagDrop(v => !v)}
-            className={`flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-[8px] transition-colors ${
+            className={`flex items-center gap-1 text-[12px] font-semibold px-2 py-1 rounded-[8px] transition-colors ${
               parent.tag ? getTagColor(parent.tag, tagColors) : 'bg-page-bg text-text-gray hover:bg-border-def'
             }`}
           >
             {parent.tag ?? '태그'}
-            <DropIcon size={10} />
+            <DropIcon size={12} />
           </button>
 
           {showTagDrop && (
-            <div
-              className="fixed z-50 bg-surface border border-border-def rounded-[10px] w-36 overflow-hidden"
-              style={{ top: 'auto', left: 'auto' }}
-              onClick={e => e.stopPropagation()}
-            >
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowTagDrop(false)} />
+              <div
+                className="absolute z-50 bg-surface border border-border-def rounded-[10px] w-36 overflow-hidden shadow-lg"
+                style={{ top: '100%', left: 0, marginTop: 4 }}
+                onClick={e => e.stopPropagation()}
+              >
               {parent.tag && (
                 <button
                   onMouseDown={() => { onUpdate(parent.id, { tag: undefined }); setShowTagDrop(false) }}
                   onTouchEnd={() => { onUpdate(parent.id, { tag: undefined }); setShowTagDrop(false) }}
-                  className="w-full text-left px-3 py-2 text-[12px] text-error hover:bg-error-bg flex items-center gap-1"
+                  className="w-full text-left px-3 py-2 text-[13px] text-error hover:bg-error-bg flex items-center gap-1"
                 >
-                  <X size={11} /> 태그 제거
+                  <X size={13} /> 태그 제거
                 </button>
               )}
               {tagList.length === 0 ? (
@@ -120,11 +122,12 @@ export default function ParentCard({
                     onTouchEnd={() => { onUpdate(parent.id, { tag: t }); setShowTagDrop(false) }}
                     className="w-full text-left px-3 py-2 hover:bg-page-bg"
                   >
-                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-[6px] ${getTagColor(t, tagColors)}`}>{t}</span>
+                    <span className={`text-[13px] font-semibold px-2 py-0.5 rounded-[6px] ${getTagColor(t, tagColors)}`}>{t}</span>
                   </button>
                 ))
               )}
             </div>
+            </>
           )}
         </div>
 
@@ -157,20 +160,20 @@ export default function ParentCard({
             done ? 'bg-teal border-teal' : 'border-border-def hover:border-teal'
           }`}
         >
-          {done && <Check size={11} className="text-white" strokeWidth={3} />}
+          {done && <Check size={13} className="text-white" strokeWidth={3} />}
         </button>
 
         {hasDetail && (
           <button onClick={() => setExpanded(e => !e)} className="p-0.5 flex-shrink-0">
-            {expanded ? <ChevronDown size={15} className="text-text-gray" /> : <ChevronRight size={15} className="text-text-gray" />}
+            {expanded ? <ChevronDown size={17} className="text-text-gray" /> : <ChevronRight size={17} className="text-text-gray" />}
           </button>
         )}
 
         <button onClick={() => onEdit(parent)} className="p-1 rounded-full hover:bg-page-bg flex-shrink-0">
-          <Pencil size={14} className="text-text-gray" style={{ opacity: 0.6 }} />
+          <Pencil size={16} className="text-text-gray" style={{ opacity: 0.6 }} />
         </button>
         <button onClick={() => onDelete(parent.id)} className="p-1 rounded-full hover:bg-error-bg flex-shrink-0">
-          <Trash2 size={14} className="text-error" style={{ opacity: 0.5 }} />
+          <Trash2 size={16} className="text-error" style={{ opacity: 0.5 }} />
         </button>
       </div>
 

@@ -23,7 +23,7 @@ function MemoCard({ memo, onUpdate, onDelete }: { memo: MemoItem; onUpdate: (id:
   return (
     <div className="bg-teal-light border-[1.5px] border-teal-border rounded-[10px] px-4 py-3 mb-2 group">
       <div className="flex items-start gap-2">
-        <StickyNote size={14} className="text-teal flex-shrink-0 mt-0.5" />
+        <StickyNote size={16} className="text-teal flex-shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
           {editing ? (
             <textarea
@@ -45,7 +45,7 @@ function MemoCard({ memo, onUpdate, onDelete }: { memo: MemoItem; onUpdate: (id:
           onClick={() => onDelete(memo.id)}
           className="opacity-0 group-hover:opacity-100 p-1 rounded-[6px] hover:bg-error-bg flex-shrink-0 transition-all"
         >
-          <Trash2 size={13} className="text-error" />
+          <Trash2 size={16} className="text-error" />
         </button>
       </div>
     </div>

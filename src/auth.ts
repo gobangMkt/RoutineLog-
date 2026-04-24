@@ -33,14 +33,14 @@ export async function register(phone: string, password: string): Promise<void> {
     uid: cred.user.uid,
     createdAt: new Date().toISOString(),
   })
-  sessionStorage.setItem('rl_phone', normalized)
-  sessionStorage.setItem('rl_uid', cred.user.uid)
+  localStorage.setItem('rl_phone', normalized)
+  localStorage.setItem('rl_uid', cred.user.uid)
 }
 
 export async function login(phone: string, password: string): Promise<void> {
   const cred = await signInWithEmailAndPassword(auth, toEmail(phone), password)
-  sessionStorage.setItem('rl_phone', normalizePhone(phone))
-  sessionStorage.setItem('rl_uid', cred.user.uid)
+  localStorage.setItem('rl_phone', normalizePhone(phone))
+  localStorage.setItem('rl_uid', cred.user.uid)
 }
 
 export async function resetUser(phone: string, password: string): Promise<void> {
@@ -64,14 +64,14 @@ export async function resetUser(phone: string, password: string): Promise<void> 
 }
 
 export function getSession(): { phone: string; uid: string } | null {
-  const phone = sessionStorage.getItem('rl_phone')
-  const uid = sessionStorage.getItem('rl_uid')
+  const phone = localStorage.getItem('rl_phone')
+  const uid = localStorage.getItem('rl_uid')
   if (!phone || !uid) return null
   return { phone, uid }
 }
 
 export async function clearSession(): Promise<void> {
-  sessionStorage.removeItem('rl_phone')
-  sessionStorage.removeItem('rl_uid')
+  localStorage.removeItem('rl_phone')
+  localStorage.removeItem('rl_uid')
   await signOut(auth).catch(() => {})
 }
