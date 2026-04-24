@@ -8,7 +8,7 @@ interface Props {
   today: string
 }
 
-const DAYS_WEEK = ['월', '화', '수', '목', '금', '토', '일']
+const DAYS_WEEK = ['일', '월', '화', '수', '목', '금', '토']
 
 function toYMD(y: number, m: number, d: number) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
@@ -29,7 +29,7 @@ export default function StatsTab({ markedDates, memos, today }: Props) {
   }
 
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
-  const firstDayMon = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7
+  const firstDayMon = new Date(viewYear, viewMonth, 1).getDay() // 일요일 시작: 0=일 그대로
 
   const cells: (number | null)[] = [
     ...Array(firstDayMon).fill(null),
@@ -158,7 +158,7 @@ export default function StatsTab({ markedDates, memos, today }: Props) {
         <div className="grid grid-cols-7 mb-1">
           {DAYS_WEEK.map((d, i) => (
             <div key={d} className={`text-center text-[11px] font-semibold py-0.5 ${
-              i === 5 ? 'text-[#4A90E2]' : i === 6 ? 'text-error' : 'text-text-gray'
+              i === 0 ? 'text-error' : i === 6 ? 'text-[#4A90E2]' : 'text-text-gray'
             }`}>
               {d}
             </div>
@@ -202,8 +202,8 @@ export default function StatsTab({ markedDates, memos, today }: Props) {
                   <span className={`text-[13px] font-semibold leading-none ${
                     textColor ||
                     (isToday ? 'text-teal font-bold' :
-                    col === 5 ? 'text-[#4A90E2]' :
-                    col === 6 ? 'text-error' :
+                    col === 0 ? 'text-error' :
+                    col === 6 ? 'text-[#4A90E2]' :
                     isFuture ? 'text-text-muted' :
                     'text-text-dark')
                   }`}>

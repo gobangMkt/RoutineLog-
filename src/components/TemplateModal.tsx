@@ -75,7 +75,7 @@ export default function TemplateModal({ templates, currentParents, onClose, onSa
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onClose}>
       <div
-        className="w-full max-w-[480px] bg-surface rounded-t-[20px] flex flex-col slide-up"
+        className="relative w-full max-w-[480px] bg-surface rounded-t-[20px] flex flex-col slide-up"
         style={{
           maxHeight: '85vh',
           transform: `translateY(${sheetY}px)`,
@@ -137,22 +137,14 @@ export default function TemplateModal({ templates, currentParents, onClose, onSa
                         <p className="text-[12px] text-text-gray mt-0.5">{t.parents.length}개 투두 묶음</p>
                       </div>
                       <button
-                        onClick={() => setPendingApply(pendingApply?.id === t.id && pendingApply.mode === 'merge' ? null : { id: t.id, mode: 'merge' })}
-                        className={`text-[13px] font-semibold px-3 py-1.5 rounded-[8px] transition-colors flex-shrink-0 ${
-                          pendingApply?.id === t.id && pendingApply.mode === 'merge'
-                            ? 'bg-teal text-white'
-                            : 'bg-teal-light text-teal hover:bg-teal-border'
-                        }`}
+                        onClick={() => setPendingApply({ id: t.id, mode: 'merge' })}
+                        className="text-[13px] font-semibold px-3 py-1.5 rounded-[8px] bg-teal-light text-teal hover:bg-teal-border transition-colors flex-shrink-0"
                       >
                         합치기
                       </button>
                       <button
-                        onClick={() => setPendingApply(pendingApply?.id === t.id && pendingApply.mode === 'overwrite' ? null : { id: t.id, mode: 'overwrite' })}
-                        className={`text-[13px] font-semibold px-3 py-1.5 rounded-[8px] transition-colors flex-shrink-0 ${
-                          pendingApply?.id === t.id && pendingApply.mode === 'overwrite'
-                            ? 'bg-teal text-white'
-                            : 'bg-page-bg text-text-body border border-border-def hover:border-teal'
-                        }`}
+                        onClick={() => setPendingApply({ id: t.id, mode: 'overwrite' })}
+                        className="text-[13px] font-semibold px-3 py-1.5 rounded-[8px] bg-page-bg text-text-body border border-border-def hover:border-teal transition-colors flex-shrink-0"
                       >
                         덮어쓰기
                       </button>
@@ -162,34 +154,6 @@ export default function TemplateModal({ templates, currentParents, onClose, onSa
                       </button>
                     </div>
 
-                    {/* 시간 유지 확인 (인라인) */}
-                    {pendingApply?.id === t.id && (
-                      <div className="mt-1 bg-page-bg rounded-[10px] px-4 py-3">
-                        <p className="text-[13px] font-semibold text-text-dark mb-2.5">
-                          시간을 유지할까요?
-                        </p>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleApply(true)}
-                            className="flex-1 py-2 rounded-[8px] bg-teal text-white text-[13px] font-semibold"
-                          >
-                            시간 유지
-                          </button>
-                          <button
-                            onClick={() => handleApply(false)}
-                            className="flex-1 py-2 rounded-[8px] bg-surface text-text-body text-[13px] font-semibold border border-border-def"
-                          >
-                            시간 제외
-                          </button>
-                          <button
-                            onClick={() => setPendingApply(null)}
-                            className="px-3 py-2 rounded-[8px] text-text-gray text-[13px] hover:bg-border-def"
-                          >
-                            취소
-                          </button>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 ))
               )}
@@ -233,6 +197,38 @@ export default function TemplateModal({ templates, currentParents, onClose, onSa
             </>
           )}
         </div>
+
+        {/* 시간 유지 팝업 오버레이 */}
+        {pendingApply && (
+          <div className="absolute inset-0 bg-black/40 rounded-t-[20px] flex items-center justify-center px-8 z-10">
+            <div className="bg-surface rounded-[16px] w-full p-6 shadow-xl">
+              <p className="text-[17px] font-bold text-text-dark text-center mb-1">시간을 유지할까요?</p>
+              <p className="text-[13px] text-text-gray text-center mb-5">
+                {pendingApply.mode === 'overwrite' ? '덮어쓰기' : '합치기'}로 적용합니다
+              </p>
+              <div className="flex gap-2 mb-2">
+                <button
+                  onClick={() => handleApply(false)}
+                  className="flex-1 py-3 rounded-[10px] bg-page-bg text-text-body font-semibold text-[14px] border border-border-def"
+                >
+                  시간 제외
+                </button>
+                <button
+                  onClick={() => handleApply(true)}
+                  className="flex-1 py-3 rounded-[10px] bg-teal text-white font-bold text-[14px]"
+                >
+                  시간 유지
+                </button>
+              </div>
+              <button
+                onClick={() => setPendingApply(null)}
+                className="w-full py-2 text-[13px] text-text-gray text-center"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
