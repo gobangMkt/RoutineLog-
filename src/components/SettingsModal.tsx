@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, Plus, Trash2, Tag, ChevronRight, ChevronLeft, Check, Pencil } from 'lucide-react'
 import type { UserSettings, CompletionMode } from '../types'
 import { getTagColor, TAG_COLORS } from './TagManageModal'
@@ -140,13 +140,36 @@ function TagEditRow({
 export default function SettingsModal({ settings, tagList, tagColors, phone, onClose, onUpdate, onAddTag, onDeleteTag, onSetTagColor, onRenameTag, onLogout }: Props) {
   const [view, setView] = useState<View>('main')
   const [tagInput, setTagInput] = useState('')
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [sheetY, setSheetY] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const startYRef = useRef(0)
 
-  // 배경 스크롤 잠금
   useEffect(() => {
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prev }
+    const prevent = (e: TouchEvent) => {
+      if (scrollRef.current?.contains(e.target as Node)) return
+      e.preventDefault()
+    }
+    document.addEventListener('touchmove', prevent, { passive: false })
+    return () => document.removeEventListener('touchmove', prevent)
   }, [])
+
+  const onHandlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    setIsDragging(true)
+    startYRef.current = e.clientY
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  const onHandlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return
+    setSheetY(Math.max(0, e.clientY - startYRef.current))
+  }
+
+  const onHandlePointerUp = () => {
+    setIsDragging(false)
+    if (sheetY > 100) onClose()
+    else setSheetY(0)
+  }
 
   const handleAddTag = () => {
     const t = tagInput.trim()
@@ -157,10 +180,20 @@ export default function SettingsModal({ settings, tagList, tagColors, phone, onC
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onClose}>
       <div
         className="w-full max-w-[480px] bg-surface rounded-t-[20px] slide-up flex flex-col"
-        style={{ maxHeight: '90dvh' }}
+        style={{
+          maxHeight: '90dvh',
+          transform: `translateY(${sheetY}px)`,
+          transition: isDragging ? 'none' : 'transform 0.25s ease',
+        }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="w-10 h-1 bg-border-def rounded-full mx-auto mt-5 flex-shrink-0" />
+        <div
+          className="w-10 h-1.5 bg-border-def rounded-full mx-auto mt-4 flex-shrink-0 cursor-grab active:cursor-grabbing touch-none"
+          onPointerDown={onHandlePointerDown}
+          onPointerMove={onHandlePointerMove}
+          onPointerUp={onHandlePointerUp}
+          onPointerCancel={onHandlePointerUp}
+        />
 
         {view === 'main' ? (
           <>
@@ -171,7 +204,7 @@ export default function SettingsModal({ settings, tagList, tagColors, phone, onC
               </button>
             </div>
 
-            <div className="overflow-y-auto overscroll-contain flex-1 px-6 pt-4 pb-8">
+            <div ref={scrollRef} className="overflow-y-auto overscroll-contain flex-1 px-6 pt-4 pb-8">
               {/* Sub TO-DO */}
               <div className="flex items-center justify-between px-4 py-4 rounded-[10px] border-[1.5px] border-border-def bg-page-bg mb-5">
                 <div>
@@ -257,7 +290,7 @@ export default function SettingsModal({ settings, tagList, tagColors, phone, onC
               </button>
             </div>
 
-            <div className="overflow-y-auto overscroll-contain flex-1 px-6 pt-4 pb-8">
+            <div ref={scrollRef} className="overflow-y-auto overscroll-contain flex-1 px-6 pt-4 pb-8">
               <div className="flex gap-2 mb-4">
                 <input
                   autoFocus

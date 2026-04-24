@@ -28,14 +28,39 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd, initi
   const [showTagDrop, setShowTagDrop] = useState(false)
   const [showTagTooltip, setShowTagTooltip] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [sheetY, setSheetY] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const startYRef = useRef(0)
 
   useEffect(() => {
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
     if (scrollRef.current) scrollRef.current.scrollTop = 0
-    return () => { document.body.style.overflow = prev }
+
+    const prevent = (e: TouchEvent) => {
+      if (scrollRef.current?.contains(e.target as Node)) return
+      e.preventDefault()
+    }
+    document.addEventListener('touchmove', prevent, { passive: false })
+    return () => document.removeEventListener('touchmove', prevent)
   }, [])
+
+  const onHandlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    setIsDragging(true)
+    startYRef.current = e.clientY
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  const onHandlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return
+    setSheetY(Math.max(0, e.clientY - startYRef.current))
+  }
+
+  const onHandlePointerUp = () => {
+    setIsDragging(false)
+    if (sheetY > 100) onClose()
+    else setSheetY(0)
+  }
 
   const isDisabled =
     !title.trim() ||
@@ -44,16 +69,12 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd, initi
 
   const submit = () => {
     if (isDisabled) return
-    try {
-      const st = showTime && startEnabled && isValidTime(startTime) ? startTime : undefined
-      const et = showTime && endEnabled && isValidTime(endTime) ? endTime : undefined
-      if (isEditMode && onEdit) {
-        onEdit({ title: title.trim(), description: description.trim() || undefined, startTime: st, endTime: et, tag: tag || undefined })
-      } else if (onAdd) {
-        onAdd(title.trim(), { startTime: st, endTime: et, description: description.trim() || undefined, tag: tag || undefined })
-      }
-    } catch (e) {
-      console.error('submit error:', e)
+    const st = showTime && startEnabled && isValidTime(startTime) ? startTime : undefined
+    const et = showTime && endEnabled && isValidTime(endTime) ? endTime : undefined
+    if (isEditMode && onEdit) {
+      onEdit({ title: title.trim(), description: description.trim() || undefined, startTime: st, endTime: et, tag: tag || undefined })
+    } else if (onAdd) {
+      onAdd(title.trim(), { startTime: st, endTime: et, description: description.trim() || undefined, tag: tag || undefined })
     }
     onClose()
   }
@@ -66,12 +87,24 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd, initi
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onClose}>
       <div
         className="w-full max-w-[480px] bg-surface rounded-t-[20px] slide-up flex flex-col"
-        style={{ maxHeight: '90dvh' }}
+        style={{
+          maxHeight: '90dvh',
+          transform: `translateY(${sheetY}px)`,
+          transition: isDragging ? 'none' : 'transform 0.25s ease',
+        }}
         onClick={e => e.stopPropagation()}
       >
+        {/* 드래그 핸들 */}
+        <div
+          className="w-10 h-1.5 bg-border-def rounded-full mx-auto mt-4 flex-shrink-0 cursor-grab active:cursor-grabbing touch-none"
+          onPointerDown={onHandlePointerDown}
+          onPointerMove={onHandlePointerMove}
+          onPointerUp={onHandlePointerUp}
+          onPointerCancel={onHandlePointerUp}
+        />
+
         {/* 헤더 */}
-        <div className="flex-shrink-0 px-6 pt-6 pb-0">
-          <div className="w-10 h-1 bg-border-def rounded-full mx-auto mb-5" />
+        <div className="flex-shrink-0 px-6 pt-4 pb-0">
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-[20px] font-bold text-text-dark">{isEditMode ? 'TO-DO 수정' : 'TO-DO 추가'}</h3>
             <button onClick={onClose} className="p-1 rounded-[8px] hover:bg-page-bg"><X size={20} className="text-text-gray" /></button>
@@ -184,38 +217,48 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd, initi
 
         {/* 하단 버튼 */}
         <div className="flex-shrink-0 px-6 pt-3 pb-8">
-          {isEditMode && onDelete && (
+          {isEditMode && onDelete ? (
             confirmDelete ? (
-              <div className="flex gap-2 mb-3">
+              <div className="flex gap-2">
                 <button
                   onClick={() => { onDelete(); onClose() }}
-                  className="flex-1 py-[13px] rounded-[10px] bg-error text-white font-bold text-[15px] flex items-center justify-center gap-1.5"
+                  className="flex-1 py-[15px] rounded-[10px] bg-error text-white font-bold text-[15px] flex items-center justify-center gap-1.5"
                 >
                   <Trash2 size={15} /> 삭제 확인
                 </button>
                 <button
                   onClick={() => setConfirmDelete(false)}
-                  className="flex-1 py-[13px] rounded-[10px] bg-page-bg text-text-gray font-bold text-[15px]"
+                  className="flex-1 py-[15px] rounded-[10px] bg-page-bg text-text-gray font-bold text-[15px]"
                 >
                   취소
                 </button>
               </div>
             ) : (
-              <button
-                onClick={() => setConfirmDelete(true)}
-                className="w-full py-[13px] rounded-[10px] border border-error text-error font-semibold text-[15px] mb-3 hover:bg-error-bg transition-colors flex items-center justify-center gap-1.5"
-              >
-                <Trash2 size={15} /> 삭제하기
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="flex-1 py-[15px] rounded-[10px] border-[1.5px] border-error text-error font-semibold text-[15px] flex items-center justify-center gap-1.5 hover:bg-error-bg transition-colors"
+                >
+                  <Trash2 size={15} /> 삭제
+                </button>
+                <button
+                  onClick={submit}
+                  disabled={isDisabled}
+                  className="flex-1 py-[15px] rounded-[10px] bg-teal text-white font-bold text-[15px] disabled:bg-disabled-bg disabled:text-text-muted hover:bg-teal-hover transition-colors"
+                >
+                  수정 완료
+                </button>
+              </div>
             )
+          ) : (
+            <button
+              onClick={submit}
+              disabled={isDisabled}
+              className="w-full py-[15px] rounded-[10px] bg-teal text-white font-bold text-[16px] disabled:bg-disabled-bg disabled:text-text-muted hover:bg-teal-hover transition-colors"
+            >
+              추가하기
+            </button>
           )}
-          <button
-            onClick={submit}
-            disabled={isDisabled}
-            className="w-full py-[15px] rounded-[10px] bg-teal text-white font-bold text-[16px] disabled:bg-disabled-bg disabled:text-text-muted hover:bg-teal-hover transition-colors"
-          >
-            {isEditMode ? '수정 완료' : '추가하기'}
-          </button>
         </div>
       </div>
     </div>

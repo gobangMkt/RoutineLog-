@@ -285,7 +285,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
             </div>
 
             {/* 통합 카드: 서브탭 + 콘텐츠 */}
-            <div className="bg-surface mt-2">
+            <div className="bg-surface border-t border-border-def">
               {/* 서브탭 + 정렬 — 항상 고정 위치 */}
               <div className="px-5 py-2 flex items-center justify-between border-b border-border-def">
                 <div className="flex items-center gap-1">
