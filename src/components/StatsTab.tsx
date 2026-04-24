@@ -100,13 +100,13 @@ export default function StatsTab({ markedDates, memos, today }: Props) {
           <span className="text-[22px] font-bold text-teal leading-none">{doneDays}</span>
           <span className="text-[11px] text-teal mt-1.5 font-medium text-center">완료일</span>
         </div>
-        <div className="bg-page-bg rounded-[14px] px-3 py-4 flex flex-col items-center">
-          <span className="text-[22px] font-bold text-text-dark leading-none">{totalTodoDays}</span>
-          <span className="text-[11px] text-text-gray mt-1.5 font-medium text-center">기록일</span>
+        <div className="bg-[#FFF7ED] rounded-[14px] px-3 py-4 flex flex-col items-center">
+          <span className="text-[22px] font-bold text-[#D97706] leading-none">{totalTodoDays}</span>
+          <span className="text-[11px] text-[#D97706] mt-1.5 font-medium text-center">기록일</span>
         </div>
-        <div className="bg-page-bg rounded-[14px] px-3 py-4 flex flex-col items-center">
-          <span className="text-[22px] font-bold text-text-dark leading-none">{memoDays}</span>
-          <span className="text-[11px] text-text-gray mt-1.5 font-medium text-center">메모일</span>
+        <div className="bg-[#EEF2FF] rounded-[14px] px-3 py-4 flex flex-col items-center">
+          <span className="text-[22px] font-bold text-[#4F6AE6] leading-none">{memoDays}</span>
+          <span className="text-[11px] text-[#4F6AE6] mt-1.5 font-medium text-center">메모일</span>
         </div>
       </div>
 

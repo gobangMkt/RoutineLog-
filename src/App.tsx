@@ -346,7 +346,9 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
                   {totalCount > 0 && (
                     <div className="px-5 pt-3 pb-2">
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[13px] font-semibold text-teal">{doneCount}/{totalCount} 완료</span>
+                        <span className={`text-[13px] font-semibold ${
+                      doneCount === totalCount ? 'text-teal' : doneCount > 0 ? 'text-[#D97706]' : 'text-text-gray'
+                    }`}>{doneCount}/{totalCount} 완료</span>
                         <span className="text-[12px] text-text-muted">{Math.round((doneCount / totalCount) * 100)}%</span>
                       </div>
                       <div className="h-1.5 bg-border-def rounded-full overflow-hidden">
