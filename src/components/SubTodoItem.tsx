@@ -21,11 +21,11 @@ export default function SubTodoItem({ sub, onToggle, onDelete, onUpdate }: Props
   }
 
   return (
-    <div className="flex items-center gap-2 py-1.5 pl-9 pr-2 group hover:bg-gray-50 rounded-lg">
+    <div className="flex items-center gap-2 py-1.5 pl-9 pr-2 group hover:bg-page-bg rounded-[10px]">
       <button
         onClick={() => onToggle(sub.id)}
         className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-          done ? 'bg-gray-300 border-gray-300' : 'border-gray-300 hover:border-primary'
+          done ? 'bg-teal border-teal' : 'border-border-def hover:border-teal'
         }`}
       >
         {done && <Check size={10} className="text-white" strokeWidth={3} />}
@@ -38,12 +38,12 @@ export default function SubTodoItem({ sub, onToggle, onDelete, onUpdate }: Props
           onChange={e => setVal(e.target.value)}
           onBlur={commit}
           onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setVal(sub.title); setEditing(false) } }}
-          className="flex-1 text-sm bg-transparent border-b border-primary outline-none py-0.5"
+          className="flex-1 text-[13px] bg-transparent border-b border-teal outline-none py-0.5 text-text-dark"
         />
       ) : (
         <span
           onClick={() => setEditing(true)}
-          className={`flex-1 text-sm cursor-pointer ${done ? 'line-through text-gray-400' : 'text-gray-700'}`}
+          className={`flex-1 text-[13px] cursor-pointer ${done ? 'line-through text-text-gray' : 'text-text-body'}`}
         >
           {sub.title}
         </span>
@@ -51,9 +51,9 @@ export default function SubTodoItem({ sub, onToggle, onDelete, onUpdate }: Props
 
       <button
         onClick={() => onDelete(sub.id)}
-        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 transition-all"
+        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-error-bg transition-all"
       >
-        <Trash2 size={13} className="text-red-400" />
+        <Trash2 size={13} className="text-error" />
       </button>
     </div>
   )

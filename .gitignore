@@ -4,3 +4,9 @@ dist
 *.local
 unzipped1
 unzipped2
+
+.vercel
+.env
+.env.local
+.env.*.local
+.claude
