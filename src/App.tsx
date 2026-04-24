@@ -280,29 +280,13 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
         {/* 루틴 탭 */}
         {mainTab === 'routine' && (
           <>
-            <div className="bg-surface mt-2">
+            <div className="bg-surface">
               <Calendar currentDate={currentDate} markedDates={markedDates} onSelectDate={setCurrentDate} />
             </div>
 
             {/* 통합 카드: 서브탭 + 콘텐츠 */}
             <div className="bg-surface mt-2">
-              {/* 진행률 바 */}
-              {subTab === 'todo' && totalCount > 0 && (
-                <div className="px-5 pt-3 pb-2">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[13px] font-semibold text-teal">{doneCount}/{totalCount} 완료</span>
-                    <span className="text-[12px] text-text-muted">{Math.round((doneCount / totalCount) * 100)}%</span>
-                  </div>
-                  <div className="h-1.5 bg-border-def rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-teal rounded-full transition-all duration-500"
-                      style={{ width: `${Math.round((doneCount / totalCount) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* 서브탭 + 정렬 */}
+              {/* 서브탭 + 정렬 — 항상 고정 위치 */}
               <div className="px-5 py-2 flex items-center justify-between border-b border-border-def">
                 <div className="flex items-center gap-1">
                   <button
@@ -357,7 +341,25 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
                 )}
               </div>
 
-              {subTab === 'todo' && renderTodoList()}
+              {subTab === 'todo' && (
+                <>
+                  {totalCount > 0 && (
+                    <div className="px-5 pt-3 pb-2">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[13px] font-semibold text-teal">{doneCount}/{totalCount} 완료</span>
+                        <span className="text-[12px] text-text-muted">{Math.round((doneCount / totalCount) * 100)}%</span>
+                      </div>
+                      <div className="h-1.5 bg-border-def rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-teal rounded-full transition-all duration-500"
+                          style={{ width: `${Math.round((doneCount / totalCount) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {renderTodoList()}
+                </>
+              )}
               {subTab === 'memo' && (
                 <div className="px-5 py-5">
                   <DailyMemoSection
