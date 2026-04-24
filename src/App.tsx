@@ -149,7 +149,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
   const renderTodoList = () => {
     if (dayParents.length === 0) {
       return (
-        <div className="bg-surface px-5 py-10 flex flex-col items-center">
+        <div className="bg-surface flex flex-col items-center justify-center" style={{ minHeight: 'calc(100dvh - 420px)' }}>
           <div className="w-16 h-16 rounded-full bg-teal-light flex items-center justify-center mb-4 text-3xl">📋</div>
           <p className="text-[15px] font-semibold text-text-dark">TO-DO가 없어요</p>
           <p className="text-[14px] text-text-gray mt-1">아래 버튼으로 추가해보세요</p>
