@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from './firebase'
-import { Plus, StickyNote, CheckSquare, Settings, BookTemplate, LogOut } from 'lucide-react'
+import { Plus, StickyNote, CheckSquare, Settings, BookTemplate, LogOut, BarChart2 } from 'lucide-react'
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor,
   useSensor, useSensors, type DragEndEvent,
@@ -22,9 +22,10 @@ import DailyMemoSection from './components/DailyMemoSection'
 import AddTodoModal from './components/AddTodoModal'
 import TemplateModal from './components/TemplateModal'
 import SettingsModal from './components/SettingsModal'
+import StatsTab from './components/StatsTab'
 import { getTagColor } from './components/TagManageModal'
 
-type Tab = 'todo' | 'memo'
+type Tab = 'todo' | 'memo' | 'stats'
 type Modal = 'addTodo' | 'template' | 'settings' | null
 
 const VIEW_MODES: { value: ViewMode; label: string }[] = [
@@ -33,7 +34,6 @@ const VIEW_MODES: { value: ViewMode; label: string }[] = [
   { value: 'tag',     label: '태그별' },
 ]
 
-// 드래그 가능한 카드 래퍼
 function SortableCard({
   parent,
   children,
@@ -60,7 +60,6 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
   const [editingParent, setEditingParent] = useState<ParentTodo | null>(null)
   const [blockAddBtn, setBlockAddBtn] = useState(false)
 
-  // 모달 닫힌 직후 고스트 클릭으로 하단 버튼이 눌리는 것 방지
   const closeModal = () => { setModal(null); setBlockAddBtn(true); setTimeout(() => setBlockAddBtn(false), 600) }
   const closeEditing = () => { setEditingParent(null); setBlockAddBtn(true); setTimeout(() => setBlockAddBtn(false), 600) }
 
@@ -69,7 +68,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
     dayParents, getSubsFor, markedDates, parents,
     addParent, updateParent, deleteParent, toggleParent, reorderParents,
     addSub, updateSub, deleteSub, toggleSub,
-    getMemosForDate, addMemo, updateMemo, deleteMemo,
+    memos, getMemosForDate, addMemo, updateMemo, deleteMemo,
     tagList, tagColors, addTag, deleteTag, setTagColor, renameTag,
     templates, saveTemplate, deleteTemplate, applyTemplate,
     settings, setSettings,
@@ -111,11 +110,12 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
   const totalCount = dayParents.length
   const dayMemos = getMemosForDate(currentDate)
   const viewMode = settings.viewMode ?? 'default'
+  const today = new Date().toISOString().slice(0, 10)
 
   const formatSelectedDate = (d: string) => {
     const date = new Date(d + 'T00:00:00')
     const days = ['일', '월', '화', '수', '목', '금', '토']
-    const label = d === new Date().toISOString().slice(0, 10) ? ' · 오늘' : ''
+    const label = d === today ? ' · 오늘' : ''
     return `${date.getMonth() + 1}월 ${date.getDate()}일 ${days[date.getDay()]}요일${label}`
   }
 
@@ -133,7 +133,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
 
   const cardProps = {
     tagList, tagColors, enableSubTodo: settings.enableSubTodo,
-    onToggle: toggleParent, onDelete: deleteParent,
+    onToggle: toggleParent,
     onUpdate: (id: string, patch: Partial<ParentTodo>) => updateParent(id, patch),
     onEdit: (p: ParentTodo) => setEditingParent(p),
     onAddSub: addSub, onToggleSub: toggleSub, onDeleteSub: deleteSub,
@@ -151,7 +151,6 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
       )
     }
 
-    // 추가순 — 드래그 가능
     if (viewMode === 'default') {
       return (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -174,7 +173,6 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
       )
     }
 
-    // 태그별 — 그룹 헤더
     if (viewMode === 'tag') {
       const groups: { tag: string | undefined; items: typeof dayParents }[] = []
       dayParents.forEach(p => {
@@ -206,7 +204,6 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
       )
     }
 
-    // 시간순
     return (
       <>
         {dayParents.map(parent => (
@@ -233,6 +230,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
           </div>
         </div>
       )}
+
       {/* Header */}
       <header className="sticky top-0 z-20 bg-surface border-b border-border-def w-full">
         <div className="max-w-[480px] mx-auto px-5 pt-5 pb-0 flex items-center justify-between">
@@ -267,7 +265,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
           </button>
           <button
             onClick={() => setTab('memo')}
-            className={`flex items-center gap-1.5 px-1 pb-2.5 text-[14px] font-semibold border-b-2 transition-colors ${
+            className={`flex items-center gap-1.5 px-1 pb-2.5 mr-6 text-[14px] font-semibold border-b-2 transition-colors ${
               tab === 'memo' ? 'border-teal text-teal' : 'border-transparent text-text-gray'
             }`}
           >
@@ -275,6 +273,14 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
             {dayMemos.length > 0 && tab !== 'memo' && (
               <span className="w-1.5 h-1.5 rounded-full bg-teal" />
             )}
+          </button>
+          <button
+            onClick={() => setTab('stats')}
+            className={`flex items-center gap-1.5 px-1 pb-2.5 text-[14px] font-semibold border-b-2 transition-colors ${
+              tab === 'stats' ? 'border-teal text-teal' : 'border-transparent text-text-gray'
+            }`}
+          >
+            <BarChart2 size={15} /> 통계
           </button>
           <div className="flex-1" />
           <button
@@ -287,70 +293,81 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
       </header>
 
       <main className={`max-w-[480px] mx-auto ${tab === 'todo' ? 'pb-[90px]' : 'pb-6'}`}>
-        {/* Calendar */}
-        <div className="bg-surface mt-2">
-          <Calendar currentDate={currentDate} markedDates={markedDates} onSelectDate={setCurrentDate} />
-        </div>
-
-        {/* Date + progress + 정렬 탭 */}
-        <div className="bg-surface mt-2 px-5 pt-4 pb-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[15px] font-semibold text-text-dark">{formatSelectedDate(currentDate)}</h2>
-            {tab === 'todo' && totalCount > 0 && (
-              <span className="text-[13px] font-semibold text-teal">{doneCount}/{totalCount} 완료</span>
-            )}
-          </div>
-          {tab === 'todo' && totalCount > 0 && (
-            <div className="h-1.5 bg-border-def rounded-full overflow-hidden mt-2">
-              <div
-                className="h-full bg-teal rounded-full transition-all duration-500"
-                style={{ width: `${Math.round((doneCount / totalCount) * 100)}%` }}
-              />
-            </div>
-          )}
-
-          {/* 정렬 탭 — TO-DO 탭에서만 표시 */}
-          {tab === 'todo' && (
-            <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-border-def">
-              <span className="text-[11px] text-text-gray font-medium mr-0.5">정렬</span>
-              {VIEW_MODES.map(m => (
-                <button
-                  key={m.value}
-                  onClick={() => setSettings({ ...settings, viewMode: m.value })}
-                  className={`px-3 py-1 rounded-full text-[12px] font-semibold transition-colors ${
-                    viewMode === m.value
-                      ? 'bg-teal text-white'
-                      : 'bg-page-bg text-text-gray hover:bg-border-def'
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
-              {viewMode === 'default' && dayParents.length > 1 && (
-                <span className="text-[11px] text-text-muted ml-auto">≡ 길게 눌러 순서 변경</span>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* TO-DO 탭 */}
-        {tab === 'todo' && (
+        {/* 통계 탭 */}
+        {tab === 'stats' && (
           <div className="mt-2">
-            {renderTodoList()}
+            <StatsTab markedDates={markedDates} memos={memos} today={today} />
           </div>
         )}
 
-        {/* 메모 탭 */}
-        {tab === 'memo' && (
-          <div className="bg-surface mt-2 px-5 py-5">
-            <DailyMemoSection
-              date={currentDate}
-              memos={dayMemos}
-              onAdd={addMemo}
-              onUpdate={updateMemo}
-              onDelete={deleteMemo}
-            />
-          </div>
+        {/* TO-DO / 메모 탭: 캘린더 + 날짜 정보 */}
+        {tab !== 'stats' && (
+          <>
+            {/* Calendar */}
+            <div className="bg-surface mt-2">
+              <Calendar currentDate={currentDate} markedDates={markedDates} onSelectDate={setCurrentDate} />
+            </div>
+
+            {/* Date + progress + 정렬 탭 */}
+            <div className="bg-surface mt-2 px-5 pt-4 pb-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-[15px] font-semibold text-text-dark">{formatSelectedDate(currentDate)}</h2>
+                {tab === 'todo' && totalCount > 0 && (
+                  <span className="text-[13px] font-semibold text-teal">{doneCount}/{totalCount} 완료</span>
+                )}
+              </div>
+              {tab === 'todo' && totalCount > 0 && (
+                <div className="h-1.5 bg-border-def rounded-full overflow-hidden mt-2">
+                  <div
+                    className="h-full bg-teal rounded-full transition-all duration-500"
+                    style={{ width: `${Math.round((doneCount / totalCount) * 100)}%` }}
+                  />
+                </div>
+              )}
+
+              {tab === 'todo' && (
+                <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-border-def">
+                  <span className="text-[11px] text-text-gray font-medium mr-0.5">정렬</span>
+                  {VIEW_MODES.map(m => (
+                    <button
+                      key={m.value}
+                      onClick={() => setSettings({ ...settings, viewMode: m.value })}
+                      className={`px-3 py-1 rounded-full text-[12px] font-semibold transition-colors ${
+                        viewMode === m.value
+                          ? 'bg-teal text-white'
+                          : 'bg-page-bg text-text-gray hover:bg-border-def'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                  {viewMode === 'default' && dayParents.length > 1 && (
+                    <span className="text-[11px] text-text-muted ml-auto">≡ 길게 눌러 순서 변경</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* TO-DO 목록 */}
+            {tab === 'todo' && (
+              <div className="mt-2">
+                {renderTodoList()}
+              </div>
+            )}
+
+            {/* 메모 */}
+            {tab === 'memo' && (
+              <div className="bg-surface mt-2 px-5 py-5">
+                <DailyMemoSection
+                  date={currentDate}
+                  memos={dayMemos}
+                  onAdd={addMemo}
+                  onUpdate={updateMemo}
+                  onDelete={deleteMemo}
+                />
+              </div>
+            )}
+          </>
         )}
       </main>
 
@@ -379,6 +396,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
           onClose={closeEditing}
           initialData={editingParent}
           onEdit={patch => updateParent(editingParent.id, patch)}
+          onDelete={() => deleteParent(editingParent.id)}
         />
       )}
       {modal === 'template' && (

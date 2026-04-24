@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Clock, ChevronDown, Info } from 'lucide-react'
+import { X, Clock, ChevronDown, Info, Trash2 } from 'lucide-react'
 import { formatTimeInput, isValidTime } from '../types'
 import type { ParentTodo } from '../types'
 import { getTagColor } from './TagManageModal'
@@ -11,9 +11,10 @@ interface Props {
   onAdd?: (title: string, opts: { startTime?: string; endTime?: string; description?: string; tag?: string }) => void
   initialData?: ParentTodo
   onEdit?: (patch: Partial<ParentTodo>) => void
+  onDelete?: () => void
 }
 
-export default function AddTodoModal({ tagList, tagColors, onClose, onAdd, initialData, onEdit }: Props) {
+export default function AddTodoModal({ tagList, tagColors, onClose, onAdd, initialData, onEdit, onDelete }: Props) {
   const isEditMode = !!initialData
 
   const [title, setTitle] = useState(initialData?.title ?? '')
@@ -26,6 +27,7 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd, initi
   const [tag, setTag] = useState(initialData?.tag ?? '')
   const [showTagDrop, setShowTagDrop] = useState(false)
   const [showTagTooltip, setShowTagTooltip] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -35,13 +37,11 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd, initi
     return () => { document.body.style.overflow = prev }
   }, [])
 
-  // 버튼 활성화 조건
   const isDisabled =
     !title.trim() ||
     (showTime && startEnabled && !isValidTime(startTime)) ||
     (showTime && endEnabled && !isValidTime(endTime))
 
-  // 무조건 닫기 — 오류가 나도 닫힘
   const submit = () => {
     if (isDisabled) return
     try {
@@ -55,7 +55,7 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd, initi
     } catch (e) {
       console.error('submit error:', e)
     }
-    onClose() // 무조건 실행
+    onClose()
   }
 
   const handleTimeInput = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -166,6 +166,31 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd, initi
 
         {/* 하단 버튼 */}
         <div className="flex-shrink-0 px-6 pt-3 pb-8">
+          {isEditMode && onDelete && (
+            confirmDelete ? (
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={() => { onDelete(); onClose() }}
+                  className="flex-1 py-[13px] rounded-[10px] bg-error text-white font-bold text-[15px] flex items-center justify-center gap-1.5"
+                >
+                  <Trash2 size={15} /> 삭제 확인
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="flex-1 py-[13px] rounded-[10px] bg-page-bg text-text-gray font-bold text-[15px]"
+                >
+                  취소
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="w-full py-[13px] rounded-[10px] border border-error text-error font-semibold text-[15px] mb-3 hover:bg-error-bg transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Trash2 size={15} /> 삭제하기
+              </button>
+            )
+          )}
           <button
             onClick={submit}
             disabled={isDisabled}
