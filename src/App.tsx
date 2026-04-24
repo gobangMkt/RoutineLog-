@@ -284,60 +284,6 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
             </button>
           </div>
 
-          {/* 서브 탭: TO-DO / 메모 (루틴 탭일 때만) */}
-          {mainTab === 'routine' && (
-            <div className="flex items-center border-t border-border-def pt-2 pb-2 gap-3">
-              {/* 정렬 드롭다운 */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowSortDrop(v => !v)}
-                  className="flex items-center gap-1 text-[12px] font-semibold px-2.5 py-1.5 rounded-[8px] bg-page-bg text-text-body hover:bg-border-def transition-colors"
-                >
-                  {currentSortLabel}
-                  <ChevronDown size={12} className="text-text-gray" />
-                </button>
-                {showSortDrop && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowSortDrop(false)} />
-                    <div className="absolute top-full left-0 mt-1 z-50 bg-surface border border-border-def rounded-[10px] shadow-md overflow-hidden w-24">
-                      {VIEW_MODES.map(m => (
-                        <button
-                          key={m.value}
-                          onClick={() => { setSettings({ ...settings, viewMode: m.value }); setShowSortDrop(false) }}
-                          className={`w-full text-left px-3 py-2 text-[13px] font-semibold transition-colors ${
-                            viewMode === m.value ? 'bg-teal-light text-teal' : 'text-text-body hover:bg-page-bg'
-                          }`}
-                        >
-                          {m.label}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* TO-DO / 메모 서브탭 */}
-              <button
-                onClick={() => setSubTab('todo')}
-                className={`flex items-center gap-1.5 text-[13px] font-semibold px-2.5 py-1.5 rounded-[8px] transition-colors ${
-                  subTab === 'todo' ? 'bg-teal text-white' : 'text-text-gray hover:bg-page-bg'
-                }`}
-              >
-                <CheckSquare size={13} /> TO-DO
-              </button>
-              <button
-                onClick={() => setSubTab('memo')}
-                className={`flex items-center gap-1.5 text-[13px] font-semibold px-2.5 py-1.5 rounded-[8px] transition-colors ${
-                  subTab === 'memo' ? 'bg-teal text-white' : 'text-text-gray hover:bg-page-bg'
-                }`}
-              >
-                <StickyNote size={13} /> 메모
-                {dayMemos.length > 0 && subTab !== 'memo' && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-teal" />
-                )}
-              </button>
-            </div>
-          )}
         </div>
       </header>
 
@@ -356,6 +302,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
               <Calendar currentDate={currentDate} markedDates={markedDates} onSelectDate={setCurrentDate} />
             </div>
 
+            {/* 날짜 + 진행률 */}
             <div className="bg-surface mt-2 px-5 pt-4 pb-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-[15px] font-semibold text-text-dark">{formatSelectedDate(currentDate)}</h2>
@@ -371,8 +318,62 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
                   />
                 </div>
               )}
-              {viewMode === 'default' && subTab === 'todo' && dayParents.length > 1 && (
-                <p className="text-[11px] text-text-muted mt-2">≡ 길게 눌러 순서 변경</p>
+            </div>
+
+            {/* 서브탭 + 정렬 */}
+            <div className="bg-surface mt-2 px-5 py-2 flex items-center justify-between border-b border-border-def">
+              {/* TO-DO / 메모 탭 */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setSubTab('todo')}
+                  className={`flex items-center gap-1.5 px-1 py-2 mr-4 text-[14px] font-semibold border-b-2 transition-colors ${
+                    subTab === 'todo' ? 'border-teal text-teal' : 'border-transparent text-text-gray'
+                  }`}
+                >
+                  <CheckSquare size={14} /> TO-DO
+                </button>
+                <button
+                  onClick={() => setSubTab('memo')}
+                  className={`flex items-center gap-1.5 px-1 py-2 text-[14px] font-semibold border-b-2 transition-colors ${
+                    subTab === 'memo' ? 'border-teal text-teal' : 'border-transparent text-text-gray'
+                  }`}
+                >
+                  <StickyNote size={14} /> 메모
+                  {dayMemos.length > 0 && subTab !== 'memo' && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal" />
+                  )}
+                </button>
+              </div>
+
+              {/* 정렬 드롭다운 (우측) */}
+              {subTab === 'todo' && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowSortDrop(v => !v)}
+                    className="flex items-center gap-1 text-[12px] font-semibold px-2.5 py-1.5 rounded-[8px] bg-page-bg text-text-body hover:bg-border-def transition-colors"
+                  >
+                    {currentSortLabel}
+                    <ChevronDown size={12} className="text-text-gray" />
+                  </button>
+                  {showSortDrop && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowSortDrop(false)} />
+                      <div className="absolute top-full right-0 mt-1 z-50 bg-surface border border-border-def rounded-[10px] shadow-md overflow-hidden w-24">
+                        {VIEW_MODES.map(m => (
+                          <button
+                            key={m.value}
+                            onClick={() => { setSettings({ ...settings, viewMode: m.value }); setShowSortDrop(false) }}
+                            className={`w-full text-left px-3 py-2 text-[13px] font-semibold transition-colors ${
+                              viewMode === m.value ? 'bg-teal-light text-teal' : 'text-text-body hover:bg-page-bg'
+                            }`}
+                          >
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
             </div>
 
