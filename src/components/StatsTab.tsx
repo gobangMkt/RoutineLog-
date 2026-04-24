@@ -15,8 +15,9 @@ function toYMD(y: number, m: number, d: number) {
 }
 
 export default function StatsTab({ markedDates, memos, today }: Props) {
-  const [viewYear, setViewYear] = useState(() => parseInt(today.slice(0, 4)))
-  const [viewMonth, setViewMonth] = useState(() => parseInt(today.slice(5, 7)) - 1)
+  // 로컬 날짜 기준으로 초기 월 설정 (UTC 기반 today prop 대신)
+  const [viewYear, setViewYear] = useState(() => new Date().getFullYear())
+  const [viewMonth, setViewMonth] = useState(() => new Date().getMonth())
 
   const prevMonth = () => {
     if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) }
@@ -64,7 +65,8 @@ export default function StatsTab({ markedDates, memos, today }: Props) {
       .filter(d => d.startsWith(`${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`))
   ).size
 
-  const isCurrentMonth = viewYear === parseInt(today.slice(0, 4)) && viewMonth === parseInt(today.slice(5, 7)) - 1
+  const nowLocal = new Date()
+  const isCurrentMonth = viewYear === nowLocal.getFullYear() && viewMonth === nowLocal.getMonth()
 
   return (
     <div className="px-5 py-5">
