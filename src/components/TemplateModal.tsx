@@ -201,12 +201,18 @@ export default function TemplateModal({ templates, currentParents, onClose, onSa
         {/* 시간 유지 팝업 오버레이 */}
         {pendingApply && (
           <div className="absolute inset-0 bg-black/40 rounded-t-[20px] flex items-center justify-center px-8 z-10">
-            <div className="bg-surface rounded-[16px] w-full p-6 shadow-xl">
+            <div className="bg-surface rounded-[16px] w-full p-6 shadow-xl relative">
+              <button
+                onClick={() => setPendingApply(null)}
+                className="absolute top-3 right-3 p-1.5 rounded-[8px] hover:bg-page-bg transition-colors"
+              >
+                <X size={18} className="text-text-gray" />
+              </button>
               <p className="text-[17px] font-bold text-text-dark text-center mb-1">시간을 유지할까요?</p>
               <p className="text-[13px] text-text-gray text-center mb-5">
                 {pendingApply.mode === 'overwrite' ? '덮어쓰기' : '합치기'}로 적용합니다
               </p>
-              <div className="flex gap-2 mb-2">
+              <div className="flex gap-2">
                 <button
                   onClick={() => handleApply(false)}
                   className="flex-1 py-3 rounded-[10px] bg-page-bg text-text-body font-semibold text-[14px] border border-border-def"
@@ -220,12 +226,6 @@ export default function TemplateModal({ templates, currentParents, onClose, onSa
                   시간 유지
                 </button>
               </div>
-              <button
-                onClick={() => setPendingApply(null)}
-                className="w-full py-2 text-[13px] text-text-gray text-center"
-              >
-                취소
-              </button>
             </div>
           </div>
         )}
