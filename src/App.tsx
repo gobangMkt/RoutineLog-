@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from './firebase'
-import { Plus, StickyNote, CheckSquare, Settings, BookTemplate, LogOut, BarChart2, ChevronDown } from 'lucide-react'
+import { Plus, StickyNote, CheckSquare, Settings, BookTemplate, BarChart2, ChevronDown } from 'lucide-react'
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor,
   useSensor, useSensors, type DragEndEvent,
@@ -47,7 +47,7 @@ function SortableCard({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`bg-surface mt-2 ${isDragging ? 'z-50 relative' : ''}`}
+      className={`border-t border-border-def ${isDragging ? 'z-50 relative bg-surface shadow-lg' : ''}`}
     >
       {children({ ...attributes, ...listeners }, isDragging)}
     </div>
@@ -116,16 +116,6 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
   const d = new Date()
   const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
-  const formatSelectedDate = (dt: string) => {
-    const date = new Date(dt + 'T00:00:00')
-    const days = ['일', '월', '화', '수', '목', '금', '토']
-    const label = dt === today ? ' · 오늘' : ''
-    return `${date.getMonth() + 1}월 ${date.getDate()}일 ${days[date.getDay()]}요일${label}`
-  }
-
-  const formatPhoneShort = (p: string) =>
-    p.length === 11 ? `${p.slice(0, 3)}-${p.slice(3, 7)}-${p.slice(7)}` : p
-
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
     if (!over || active.id === over.id) return
@@ -149,7 +139,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
   const renderTodoList = () => {
     if (dayParents.length === 0) {
       return (
-        <div className="bg-surface flex flex-col items-center justify-center" style={{ minHeight: 'calc(100dvh - 420px)' }}>
+        <div className="flex flex-col items-center justify-center" style={{ minHeight: 'calc(100dvh - 380px)' }}>
           <div className="w-16 h-16 rounded-full bg-teal-light flex items-center justify-center mb-4 text-3xl">📋</div>
           <p className="text-[15px] font-semibold text-text-dark">TO-DO가 없어요</p>
           <p className="text-[14px] text-text-gray mt-1">아래 버튼으로 추가해보세요</p>
@@ -200,7 +190,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
                 )}
               </div>
               {group.items.map(parent => (
-                <div key={parent.id} className="bg-surface mt-2">
+                <div key={parent.id} className="border-t border-border-def">
                   <ParentCard parent={parent} subs={getSubsFor(parent.id)} {...cardProps} />
                 </div>
               ))}
@@ -213,7 +203,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
     return (
       <>
         {dayParents.map(parent => (
-          <div key={parent.id} className="bg-surface mt-2">
+          <div key={parent.id} className="border-t border-border-def">
             <ParentCard parent={parent} subs={getSubsFor(parent.id)} {...cardProps} />
           </div>
         ))}
@@ -238,9 +228,9 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
 
       {/* Header */}
       <header className="sticky top-0 z-20 bg-surface border-b border-border-def w-full">
-        <div className="max-w-[480px] mx-auto px-5 pt-4 pb-0">
+        <div className="max-w-[480px] mx-auto">
           {/* 로고 + 버튼 */}
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between px-5 pt-4 pb-3">
             <h1 onClick={goToToday} className="text-[20px] font-bold text-text-dark cursor-pointer leading-tight">
               루틴로그
             </h1>
@@ -257,35 +247,25 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
             </div>
           </div>
 
-          {/* 메인 탭: 루틴 / 통계 */}
-          <div className="flex items-center pb-3">
-            <div className="flex items-center gap-1 bg-page-bg rounded-[10px] p-1">
-              <button
-                onClick={() => setMainTab('routine')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-semibold transition-colors ${
-                  mainTab === 'routine' ? 'bg-surface text-teal shadow-sm' : 'text-text-gray hover:text-text-dark'
-                }`}
-              >
-                <CheckSquare size={14} /> 루틴
-              </button>
-              <button
-                onClick={() => setMainTab('stats')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[13px] font-semibold transition-colors ${
-                  mainTab === 'stats' ? 'bg-surface text-teal shadow-sm' : 'text-text-gray hover:text-text-dark'
-                }`}
-              >
-                <BarChart2 size={14} /> 통계
-              </button>
-            </div>
-            <div className="flex-1" />
+          {/* 메인 탭: 루틴 / 통계 — 전체 너비 반반 */}
+          <div className="flex border-t border-border-def">
             <button
-              onClick={async () => { await clearSession(); window.location.reload() }}
-              className="flex items-center gap-1 text-[12px] text-text-gray hover:text-text-dark transition-colors"
+              onClick={() => setMainTab('routine')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[14px] font-semibold transition-colors ${
+                mainTab === 'routine' ? 'bg-teal text-white' : 'text-text-gray hover:bg-page-bg'
+              }`}
             >
-              <LogOut size={12} /> {formatPhoneShort(phone)}
+              <CheckSquare size={14} /> 루틴
+            </button>
+            <button
+              onClick={() => setMainTab('stats')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[14px] font-semibold border-l border-border-def transition-colors ${
+                mainTab === 'stats' ? 'bg-teal text-white' : 'text-text-gray hover:bg-page-bg'
+              }`}
+            >
+              <BarChart2 size={14} /> 통계
             </button>
           </div>
-
         </div>
       </header>
 
@@ -304,96 +284,92 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
               <Calendar currentDate={currentDate} markedDates={markedDates} onSelectDate={setCurrentDate} />
             </div>
 
-            {/* 날짜 + 진행률 */}
-            <div className="bg-surface mt-2 px-5 pt-4 pb-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-[15px] font-semibold text-text-dark">{formatSelectedDate(currentDate)}</h2>
-                {subTab === 'todo' && totalCount > 0 && (
-                  <span className="text-[13px] font-semibold text-teal">{doneCount}/{totalCount} 완료</span>
+            {/* 통합 카드: 서브탭 + 콘텐츠 */}
+            <div className="bg-surface mt-2">
+              {/* 진행률 바 */}
+              {subTab === 'todo' && totalCount > 0 && (
+                <div className="px-5 pt-3 pb-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[13px] font-semibold text-teal">{doneCount}/{totalCount} 완료</span>
+                    <span className="text-[12px] text-text-muted">{Math.round((doneCount / totalCount) * 100)}%</span>
+                  </div>
+                  <div className="h-1.5 bg-border-def rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-teal rounded-full transition-all duration-500"
+                      style={{ width: `${Math.round((doneCount / totalCount) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 서브탭 + 정렬 */}
+              <div className="px-5 py-2 flex items-center justify-between border-b border-border-def">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setSubTab('todo')}
+                    className={`flex items-center gap-1.5 px-1 py-2 mr-4 text-[14px] font-semibold border-b-2 transition-colors ${
+                      subTab === 'todo' ? 'border-teal text-teal' : 'border-transparent text-text-gray'
+                    }`}
+                  >
+                    <CheckSquare size={14} /> TO-DO
+                  </button>
+                  <button
+                    onClick={() => setSubTab('memo')}
+                    className={`flex items-center gap-1.5 px-1 py-2 text-[14px] font-semibold border-b-2 transition-colors ${
+                      subTab === 'memo' ? 'border-teal text-teal' : 'border-transparent text-text-gray'
+                    }`}
+                  >
+                    <StickyNote size={14} /> 메모
+                    {dayMemos.length > 0 && subTab !== 'memo' && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-teal" />
+                    )}
+                  </button>
+                </div>
+
+                {subTab === 'todo' && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowSortDrop(v => !v)}
+                      className="flex items-center gap-1 text-[12px] font-semibold text-text-gray hover:text-text-dark transition-colors"
+                    >
+                      {currentSortLabel}
+                      <ChevronDown size={12} className="text-text-gray" />
+                    </button>
+                    {showSortDrop && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowSortDrop(false)} />
+                        <div className="absolute top-full right-0 mt-1 z-50 bg-surface border border-border-def rounded-[10px] shadow-md overflow-hidden w-24">
+                          {VIEW_MODES.map(m => (
+                            <button
+                              key={m.value}
+                              onClick={() => { setSettings({ ...settings, viewMode: m.value }); setShowSortDrop(false) }}
+                              className={`w-full text-left px-3 py-2 text-[13px] font-semibold transition-colors ${
+                                viewMode === m.value ? 'bg-teal-light text-teal' : 'text-text-body hover:bg-page-bg'
+                              }`}
+                            >
+                              {m.label}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
-              {subTab === 'todo' && totalCount > 0 && (
-                <div className="h-1.5 bg-border-def rounded-full overflow-hidden mt-2">
-                  <div
-                    className="h-full bg-teal rounded-full transition-all duration-500"
-                    style={{ width: `${Math.round((doneCount / totalCount) * 100)}%` }}
+
+              {subTab === 'todo' && renderTodoList()}
+              {subTab === 'memo' && (
+                <div className="px-5 py-5">
+                  <DailyMemoSection
+                    date={currentDate}
+                    memos={dayMemos}
+                    onAdd={addMemo}
+                    onUpdate={updateMemo}
+                    onDelete={deleteMemo}
                   />
                 </div>
               )}
             </div>
-
-            {/* 서브탭 + 정렬 */}
-            <div className="bg-surface mt-2 px-5 py-2 flex items-center justify-between border-b border-border-def">
-              {/* TO-DO / 메모 탭 */}
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setSubTab('todo')}
-                  className={`flex items-center gap-1.5 px-1 py-2 mr-4 text-[14px] font-semibold border-b-2 transition-colors ${
-                    subTab === 'todo' ? 'border-teal text-teal' : 'border-transparent text-text-gray'
-                  }`}
-                >
-                  <CheckSquare size={14} /> TO-DO
-                </button>
-                <button
-                  onClick={() => setSubTab('memo')}
-                  className={`flex items-center gap-1.5 px-1 py-2 text-[14px] font-semibold border-b-2 transition-colors ${
-                    subTab === 'memo' ? 'border-teal text-teal' : 'border-transparent text-text-gray'
-                  }`}
-                >
-                  <StickyNote size={14} /> 메모
-                  {dayMemos.length > 0 && subTab !== 'memo' && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-teal" />
-                  )}
-                </button>
-              </div>
-
-              {/* 정렬 드롭다운 (우측) */}
-              {subTab === 'todo' && (
-                <div className="relative">
-                  <button
-                    onClick={() => setShowSortDrop(v => !v)}
-                    className="flex items-center gap-1 text-[12px] font-semibold text-text-gray hover:text-text-dark transition-colors"
-                  >
-                    {currentSortLabel}
-                    <ChevronDown size={12} className="text-text-gray" />
-                  </button>
-                  {showSortDrop && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setShowSortDrop(false)} />
-                      <div className="absolute top-full right-0 mt-1 z-50 bg-surface border border-border-def rounded-[10px] shadow-md overflow-hidden w-24">
-                        {VIEW_MODES.map(m => (
-                          <button
-                            key={m.value}
-                            onClick={() => { setSettings({ ...settings, viewMode: m.value }); setShowSortDrop(false) }}
-                            className={`w-full text-left px-3 py-2 text-[13px] font-semibold transition-colors ${
-                              viewMode === m.value ? 'bg-teal-light text-teal' : 'text-text-body hover:bg-page-bg'
-                            }`}
-                          >
-                            {m.label}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {subTab === 'todo' && (
-              <div className="mt-2">{renderTodoList()}</div>
-            )}
-
-            {subTab === 'memo' && (
-              <div className="bg-surface mt-2 px-5 py-5">
-                <DailyMemoSection
-                  date={currentDate}
-                  memos={dayMemos}
-                  onAdd={addMemo}
-                  onUpdate={updateMemo}
-                  onDelete={deleteMemo}
-                />
-              </div>
-            )}
           </>
         )}
       </main>
@@ -441,12 +417,14 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
           settings={settings}
           tagList={tagList}
           tagColors={tagColors}
+          phone={phone}
           onClose={() => setModal(null)}
           onUpdate={setSettings}
           onAddTag={addTag}
           onDeleteTag={deleteTag}
           onSetTagColor={setTagColor}
           onRenameTag={renameTag}
+          onLogout={async () => { await clearSession(); window.location.reload() }}
         />
       )}
     </div>

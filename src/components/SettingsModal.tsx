@@ -7,12 +7,14 @@ interface Props {
   settings: UserSettings
   tagList: string[]
   tagColors: Record<string, string>
+  phone: string
   onClose: () => void
   onUpdate: (s: UserSettings) => void
   onAddTag: (name: string) => void
   onDeleteTag: (name: string) => void
   onSetTagColor: (name: string, colorId: string) => void
   onRenameTag: (oldName: string, newName: string) => void
+  onLogout: () => void
 }
 
 const modes: { value: CompletionMode; label: string; desc: string }[] = [
@@ -135,7 +137,7 @@ function TagEditRow({
   )
 }
 
-export default function SettingsModal({ settings, tagList, tagColors, onClose, onUpdate, onAddTag, onDeleteTag, onSetTagColor, onRenameTag }: Props) {
+export default function SettingsModal({ settings, tagList, tagColors, phone, onClose, onUpdate, onAddTag, onDeleteTag, onSetTagColor, onRenameTag, onLogout }: Props) {
   const [view, setView] = useState<View>('main')
   const [tagInput, setTagInput] = useState('')
 
@@ -213,7 +215,7 @@ export default function SettingsModal({ settings, tagList, tagColors, onClose, o
               <p className="text-[13px] font-semibold text-text-gray mb-2 tracking-[0.3px]">기타</p>
               <button
                 onClick={() => setView('tags')}
-                className="w-full flex items-center justify-between px-4 py-4 rounded-[10px] border-[1.5px] border-border-def bg-page-bg hover:border-teal hover:bg-teal-sel transition-colors"
+                className="w-full flex items-center justify-between px-4 py-4 rounded-[10px] border-[1.5px] border-border-def bg-page-bg hover:border-teal hover:bg-teal-sel transition-colors mb-5"
               >
                 <div className="flex items-center gap-3">
                   <Tag size={16} className="text-teal" />
@@ -226,6 +228,21 @@ export default function SettingsModal({ settings, tagList, tagColors, onClose, o
                 </div>
                 <ChevronRight size={16} className="text-text-gray" />
               </button>
+
+              {/* 계정 */}
+              <p className="text-[13px] font-semibold text-text-gray mb-2 tracking-[0.3px]">계정</p>
+              <div className="flex items-center justify-between px-4 py-4 rounded-[10px] border-[1.5px] border-border-def bg-page-bg">
+                <div>
+                  <p className="text-[14px] font-semibold text-text-dark">로그인 계정</p>
+                  <p className="text-[13px] text-text-gray mt-0.5">{phone.length === 11 ? `${phone.slice(0,3)}-${phone.slice(3,7)}-${phone.slice(7)}` : phone}</p>
+                </div>
+                <button
+                  onClick={onLogout}
+                  className="flex items-center gap-1 text-[13px] font-semibold text-error px-3 py-1.5 rounded-[8px] hover:bg-error-bg transition-colors"
+                >
+                  로그아웃
+                </button>
+              </div>
             </div>
           </>
         ) : (
