@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus, StickyNote, CheckSquare, Settings, BookTemplate, LogOut } from 'lucide-react'
 import { useStore } from './store'
 import { getSession, clearSession } from './auth'
+import type { ParentTodo } from './types'
 import AuthScreen from './components/AuthScreen'
 import Calendar from './components/Calendar'
 import ParentCard from './components/ParentCard'
@@ -14,10 +15,12 @@ import { getTagColor } from './components/TagManageModal'
 type Tab = 'todo' | 'memo'
 type Modal = 'addTodo' | 'template' | 'settings' | null
 
+
 function MainApp({ phone, uid }: { phone: string; uid: string }) {
   const store = useStore(uid)
   const [tab, setTab] = useState<Tab>('todo')
   const [modal, setModal] = useState<Modal>(null)
+  const [editingParent, setEditingParent] = useState<ParentTodo | null>(null)
 
   const {
     currentDate, setCurrentDate, goToToday,
@@ -99,6 +102,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
                     onToggle={toggleParent}
                     onDelete={deleteParent}
                     onUpdate={(id, patch) => updateParent(id, patch)}
+                    onEdit={p => setEditingParent(p)}
                     onAddSub={addSub}
                     onToggleSub={toggleSub}
                     onDeleteSub={deleteSub}
@@ -126,6 +130,7 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
               onToggle={toggleParent}
               onDelete={deleteParent}
               onUpdate={(id, patch) => updateParent(id, patch)}
+              onEdit={p => setEditingParent(p)}
               onAddSub={addSub}
               onToggleSub={toggleSub}
               onDeleteSub={deleteSub}
@@ -254,6 +259,15 @@ function MainApp({ phone, uid }: { phone: string; uid: string }) {
 
       {modal === 'addTodo' && (
         <AddTodoModal tagList={tagList} tagColors={tagColors} onClose={() => setModal(null)} onAdd={(title, opts) => addParent(title, opts)} />
+      )}
+      {editingParent && (
+        <AddTodoModal
+          tagList={tagList}
+          tagColors={tagColors}
+          onClose={() => setEditingParent(null)}
+          initialData={editingParent}
+          onEdit={patch => updateParent(editingParent.id, patch)}
+        />
       )}
       {modal === 'template' && (
         <TemplateModal

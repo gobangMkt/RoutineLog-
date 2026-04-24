@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Trash2, Check, Plus, Clock, X, ChevronDown as DropIcon } from 'lucide-react'
+import { ChevronDown, ChevronRight, Trash2, Check, Plus, Clock, X, ChevronDown as DropIcon, Pencil } from 'lucide-react'
 import type { ParentTodo, SubTodo } from '../types'
 import { formatTime, formatTimeInput, isValidTime } from '../types'
 import SubTodoItem from './SubTodoItem'
@@ -14,6 +14,7 @@ interface Props {
   onToggle: (id: string) => void
   onDelete: (id: string) => void
   onUpdate: (id: string, patch: Partial<ParentTodo>) => void
+  onEdit: (parent: ParentTodo) => void
   onAddSub: (parentId: string, title: string) => void
   onToggleSub: (id: string) => void
   onDeleteSub: (id: string) => void
@@ -22,7 +23,7 @@ interface Props {
 
 export default function ParentCard({
   parent, subs, tagList, tagColors, enableSubTodo,
-  onToggle, onDelete, onUpdate,
+  onToggle, onDelete, onUpdate, onEdit,
   onAddSub, onToggleSub, onDeleteSub, onUpdateSub,
 }: Props) {
   const [expanded, setExpanded] = useState(false)
@@ -252,6 +253,9 @@ export default function ParentCard({
             {expanded ? <ChevronDown size={15} className="text-text-gray" /> : <ChevronRight size={15} className="text-text-gray" />}
           </button>
         )}
+        <button onClick={() => onEdit(parent)} className="p-1 rounded-full hover:bg-page-bg flex-shrink-0">
+          <Pencil size={14} className="text-text-gray" style={{ opacity: 0.6 }} />
+        </button>
         <button onClick={() => onDelete(parent.id)} className="p-1 rounded-full hover:bg-error-bg flex-shrink-0">
           <Trash2 size={14} className="text-error" style={{ opacity: 0.5 }} />
         </button>

@@ -1,24 +1,31 @@
 import { useState, useEffect } from 'react'
 import { X, Clock, ChevronDown, Info } from 'lucide-react'
 import { formatTimeInput, isValidTime } from '../types'
+import type { ParentTodo } from '../types'
 import { getTagColor } from './TagManageModal'
 
 interface Props {
   tagList: string[]
   tagColors: Record<string, string>
   onClose: () => void
-  onAdd: (title: string, opts: { startTime?: string; endTime?: string; description?: string; tag?: string }) => void
+  // 추가 모드
+  onAdd?: (title: string, opts: { startTime?: string; endTime?: string; description?: string; tag?: string }) => void
+  // 수정 모드
+  initialData?: ParentTodo
+  onEdit?: (patch: Partial<ParentTodo>) => void
 }
 
-export default function AddTodoModal({ tagList, tagColors, onClose, onAdd }: Props) {
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [showTime, setShowTime] = useState(false)
-  const [startEnabled, setStartEnabled] = useState(true)
-  const [endEnabled, setEndEnabled] = useState(true)
-  const [startTime, setStartTime] = useState('')
-  const [endTime, setEndTime] = useState('')
-  const [tag, setTag] = useState('')
+export default function AddTodoModal({ tagList, tagColors, onClose, onAdd, initialData, onEdit }: Props) {
+  const isEditMode = !!initialData
+
+  const [title, setTitle] = useState(initialData?.title ?? '')
+  const [description, setDescription] = useState(initialData?.description ?? '')
+  const [showTime, setShowTime] = useState(!!(initialData?.startTime || initialData?.endTime))
+  const [startEnabled, setStartEnabled] = useState(initialData ? !!initialData.startTime : true)
+  const [endEnabled, setEndEnabled] = useState(initialData ? !!initialData.endTime : true)
+  const [startTime, setStartTime] = useState(initialData?.startTime ?? '')
+  const [endTime, setEndTime] = useState(initialData?.endTime ?? '')
+  const [tag, setTag] = useState(initialData?.tag ?? '')
   const [showTagDrop, setShowTagDrop] = useState(false)
   const [showTagTooltip, setShowTagTooltip] = useState(false)
 
@@ -33,12 +40,23 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd }: Pro
     if (!title.trim()) return
     const st = startEnabled && isValidTime(startTime) ? startTime : undefined
     const et = endEnabled && isValidTime(endTime) ? endTime : undefined
-    onAdd(title.trim(), {
-      startTime: st || undefined,
-      endTime: et || undefined,
-      description: description.trim() || undefined,
-      tag: tag || undefined,
-    })
+
+    if (isEditMode && onEdit) {
+      onEdit({
+        title: title.trim(),
+        description: description.trim() || undefined,
+        startTime: st,
+        endTime: et,
+        tag: tag || undefined,
+      })
+    } else if (onAdd) {
+      onAdd(title.trim(), {
+        startTime: st,
+        endTime: et,
+        description: description.trim() || undefined,
+        tag: tag || undefined,
+      })
+    }
     onClose()
   }
 
@@ -58,20 +76,20 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd }: Pro
       >
         {/* 고정 헤더 */}
         <div className="flex-shrink-0 px-6 pt-6 pb-0">
-          {/* Handle */}
           <div className="w-10 h-1 bg-border-def rounded-full mx-auto mb-5" />
-          {/* Title */}
           <div className="flex items-center justify-between mb-5">
-            <h3 className="text-[20px] font-bold text-text-dark">TO-DO 추가</h3>
+            <h3 className="text-[20px] font-bold text-text-dark">
+              {isEditMode ? 'TO-DO 수정' : 'TO-DO 추가'}
+            </h3>
             <button onClick={onClose} className="p-1 rounded-[8px] hover:bg-page-bg">
               <X size={20} className="text-text-gray" />
             </button>
           </div>
         </div>
 
-        {/* 스크롤 가능한 콘텐츠 */}
+        {/* 스크롤 콘텐츠 */}
         <div className="flex-1 overflow-y-auto overscroll-contain px-6 pb-2">
-          {/* Title input */}
+          {/* 제목 */}
           <div className="mb-4">
             <label className="block text-[14px] font-semibold text-text-dark mb-2">제목</label>
             <input
@@ -84,7 +102,7 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd }: Pro
             />
           </div>
 
-          {/* Description */}
+          {/* 설명 */}
           <div className="mb-4">
             <label className="block text-[14px] font-semibold text-text-dark mb-2">설명 <span className="text-text-gray font-normal text-[13px]">(선택)</span></label>
             <textarea
@@ -96,7 +114,7 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd }: Pro
             />
           </div>
 
-          {/* Time toggle */}
+          {/* 시간 설정 */}
           <div className="mb-4">
             <button
               onClick={() => setShowTime(v => !v)}
@@ -113,7 +131,6 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd }: Pro
 
             {showTime && (
               <div className="mt-3 space-y-2">
-                {/* 시작 시간 */}
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setStartEnabled(v => !v)}
@@ -123,21 +140,15 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd }: Pro
                   </button>
                   <span className="text-[13px] text-text-gray w-14 flex-shrink-0">시작 시간</span>
                   <input
-                    type="text"
-                    inputMode="numeric"
-                    value={startTime}
+                    type="text" inputMode="numeric" value={startTime}
                     onChange={handleTimeInput(setStartTime)}
-                    disabled={!startEnabled}
-                    placeholder="09:00"
-                    maxLength={5}
+                    disabled={!startEnabled} placeholder="09:00" maxLength={5}
                     className={`flex-1 border-[1.5px] rounded-[10px] px-3 py-2 text-[14px] outline-none transition-colors ${
                       !startEnabled ? 'bg-page-bg text-text-muted border-border-def' :
                       startTime && !isValidTime(startTime) ? 'border-error text-error' : 'border-border-def focus:border-teal text-text-dark'
                     }`}
                   />
                 </div>
-
-                {/* 끝 시간 */}
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setEndEnabled(v => !v)}
@@ -147,13 +158,9 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd }: Pro
                   </button>
                   <span className="text-[13px] text-text-gray w-14 flex-shrink-0">끝 시간</span>
                   <input
-                    type="text"
-                    inputMode="numeric"
-                    value={endTime}
+                    type="text" inputMode="numeric" value={endTime}
                     onChange={handleTimeInput(setEndTime)}
-                    disabled={!endEnabled}
-                    placeholder="18:00"
-                    maxLength={5}
+                    disabled={!endEnabled} placeholder="18:00" maxLength={5}
                     className={`flex-1 border-[1.5px] rounded-[10px] px-3 py-2 text-[14px] outline-none transition-colors ${
                       !endEnabled ? 'bg-page-bg text-text-muted border-border-def' :
                       endTime && !isValidTime(endTime) ? 'border-error text-error' : 'border-border-def focus:border-teal text-text-dark'
@@ -164,7 +171,7 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd }: Pro
             )}
           </div>
 
-          {/* Tag selector */}
+          {/* 태그 */}
           <div className="relative mb-4">
             <div className="flex items-center gap-1 mb-2">
               <label className="text-[14px] font-semibold text-text-dark">태그 <span className="text-text-gray font-normal text-[13px]">(선택)</span></label>
@@ -209,7 +216,7 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd }: Pro
             {showTagDrop && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-border-def rounded-[10px] z-20 overflow-hidden max-h-40 overflow-y-auto">
                 {tagList.length === 0 ? (
-                  <div className="px-4 py-3 bg-teal-light border-b border-teal-border">
+                  <div className="px-4 py-3 bg-teal-light">
                     <p className="text-[13px] text-teal font-medium">설정 메뉴에서 태그를 추가하세요</p>
                   </div>
                 ) : (
@@ -235,7 +242,7 @@ export default function AddTodoModal({ tagList, tagColors, onClose, onAdd }: Pro
             disabled={!title.trim()}
             className="w-full py-[15px] rounded-[10px] bg-teal text-white font-bold text-[16px] disabled:bg-disabled-bg disabled:text-text-muted hover:bg-teal-hover transition-colors"
           >
-            추가하기
+            {isEditMode ? '수정 완료' : '추가하기'}
           </button>
         </div>
       </div>
