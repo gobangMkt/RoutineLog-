@@ -80,8 +80,9 @@ export default function StatsTab({ markedDates, memos, today }: Props) {
           {!isCurrentMonth && (
             <button
               onClick={() => {
-                setViewYear(parseInt(today.slice(0, 4)))
-                setViewMonth(parseInt(today.slice(5, 7)) - 1)
+                const now = new Date()
+                setViewYear(now.getFullYear())
+                setViewMonth(now.getMonth())
               }}
               className="text-[11px] font-semibold text-teal px-2 py-0.5 rounded-[6px] bg-teal-light"
             >
